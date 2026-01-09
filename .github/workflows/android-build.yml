@@ -1,0 +1,52 @@
+name: Android Build (Flavor from Branch)
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine flavor from branch
+        id: flavor
+        shell: bash
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          if [[ "$BRANCH" =~ ^QA_([a-z_]+)$ ]]; then
+            echo "flavor=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch name must match QA_<flavor> pattern" >&2
+            exit 1
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle build flavor
+        shell: bash
+        run: |
+          chmod +x gradlew
+          ./gradlew clean "assemble${{ steps.flavor.outputs.flavor }}Debug" -PBUILD_NUMBER="${GITHUB_RUN_NUMBER}"
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-builds
+          path: app/build/outputs/apk/*.apk
+
+      - name: Upload to Crashlytics
+        shell: bash
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew "crashlyticsUploadDistribution${{ steps.flavor.outputs.flavor }}Debug" -PBUILD_NUMBER="${BUILD_NUMBER}"

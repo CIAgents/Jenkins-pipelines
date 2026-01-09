@@ -1,0 +1,31 @@
+name: MSBuild
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.3.1
+
+      - name: Restore packages
+        shell: cmd
+        run: nuget restore SolutionName.sln
+
+      - name: Build
+        shell: cmd
+        run: msbuild SolutionName.sln /p:Configuration=Release /p:Platform="Any CPU" /p:ProductVersion=1.0.0.${{ github.run_number }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: msbuild-release
+          path: ProjectName/bin/Release/**
