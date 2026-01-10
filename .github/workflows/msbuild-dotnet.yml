@@ -1,0 +1,45 @@
+name: MSBuild .NET Build
+
+# Migrated from: jenkinsfile-examples/msbuild/Jenkinsfile
+# This workflow demonstrates:
+# - .NET/MSBuild compilation
+# - NuGet package restoration
+# - Artifact archiving
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+      
+      - name: Restore NuGet packages
+        run: nuget restore SolutionName.sln
+      
+      - name: Build solution
+        run: |
+          msbuild SolutionName.sln `
+            /p:Configuration=Release `
+            /p:Platform="Any CPU" `
+            /p:ProductVersion=1.0.0.${{ github.run_number }}
+      
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: ProjectName/bin/Release/**
+          retention-days: 30

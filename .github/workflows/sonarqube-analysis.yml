@@ -1,0 +1,40 @@
+name: SonarQube Analysis
+
+# Migrated from: jenkinsfile-examples/sonarqube/Jenkinsfile
+# This workflow demonstrates:
+# - Code quality analysis with SonarQube
+# - Gradle build with SonarQube scanner
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Shallow clones should be disabled for better analysis
+          fetch-depth: 0
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v3
+      
+      - name: Run Gradle clean and SonarQube analysis
+        run: ./gradlew clean sonarqube
+        env:
+          # Configure these in repository secrets
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

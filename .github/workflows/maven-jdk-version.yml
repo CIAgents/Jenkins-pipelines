@@ -1,0 +1,79 @@
+name: Maven and JDK Version Example
+
+# Migrated from: pipeline-examples/maven-and-jdk-specific-version/mavenAndJdkSpecificVersion.groovy
+# This workflow demonstrates:
+# - Setting specific Java/JDK versions
+# - Maven build with specific version
+# - Best practices for CI builds (batch mode, version display, etc.)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  maven-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Display Java and Maven versions
+        run: |
+          echo "Java version:"
+          java -version
+          echo ""
+          echo "Maven version:"
+          mvn -version
+      
+      - name: Maven clean deploy
+        run: |
+          # Maven best practices for CI:
+          # --batch-mode (-B): Run in non-interactive mode (less verbose logging)
+          # -V: Display Maven and JDK versions being used
+          # -U: Force update of snapshots (useful in CI)
+          # -e: Produce execution error messages
+          # -Dsurefire.useFile=false: Display test errors in console (not just files)
+          mvn --batch-mode -V -U -e clean deploy -Dsurefire.useFile=false
+        env:
+          # Add Maven repository credentials if needed
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-artifacts
+          path: target/*.jar
+          retention-days: 30
+
+  # Example with different Java versions
+  multi-jdk-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java-version: ['8', '11', '17', '21']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Build with Maven
+        run: mvn --batch-mode -V clean verify -Dsurefire.useFile=false

@@ -1,0 +1,47 @@
+name: Reusable Go Build Workflow
+
+# This is a reusable workflow - the GitHub Actions equivalent of Jenkins shared libraries
+# It can be called from other workflows with different parameters
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: 'Go version to use'
+        required: false
+        type: string
+        default: '1.21'
+      build-script:
+        description: 'Main build script to execute'
+        required: true
+        type: string
+      post-script:
+        description: 'Post-build script to execute'
+        required: false
+        type: string
+        default: 'echo "No post script provided"'
+      working-directory:
+        description: 'Working directory for build'
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  reusable-go-build:
+    runs-on: ubuntu-latest
+    
+    container:
+      image: golang:${{ inputs.go-version }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Execute main build script
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.build-script }}
+      
+      - name: Execute post-build script
+        if: always()
+        working-directory: ${{ inputs.working-directory }}
+        run: ${{ inputs.post-script }}

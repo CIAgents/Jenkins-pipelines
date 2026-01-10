@@ -1,0 +1,115 @@
+name: Node.js Build, Test, and Deploy
+
+# Migrated from: jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+# This workflow demonstrates:
+# - Multi-stage build process
+# - Testing with Node.js
+# - Docker build and deployment
+# - Email notifications on success/failure
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Display Node version
+        run: node -v
+      
+      - name: Clean dependencies
+        run: npm prune
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Build Docker image
+        run: |
+          # Equivalent to: sh './dockerBuild.sh'
+          # Add your Docker build commands here
+          echo "Building Docker image..."
+          # docker build -t myapp:${{ github.sha }} .
+      
+      - name: Push to Docker repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Equivalent to: sh './dockerPushToRepo.sh'
+          echo "Pushing Docker image to registry..."
+          # docker push myapp:${{ github.sha }}
+        env:
+          # Configure these secrets in repository settings
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Deploy to server
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          # Equivalent to: sh 'ssh deploy@xxxxx.xxxxx.com running/xxxxxxx/dockerRun.sh'
+          echo "Deploying to production server..."
+          # Configure SSH key in secrets and use:
+          # ssh -o StrictHostKeyChecking=no deploy@server.com "cd /path && ./dockerRun.sh"
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          npm prune
+          rm -rf node_modules
+      
+      - name: Send success notification
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: Project build successful
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            Project build completed successfully!
+            
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+            Workflow: ${{ github.workflow }}
+            Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: Project build failed
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+          from: ${{ secrets.MAIL_FROM }}
+          body: |
+            Project build failed!
+            
+            Error details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}

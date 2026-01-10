@@ -1,0 +1,80 @@
+name: Declarative Pipeline with Post Conditions
+
+# Migrated from: declarative-examples/simple-examples/postConditionOrder.groovy
+# This workflow demonstrates:
+# - Post-build actions (always, success, failure)
+# - Conditional execution based on build status
+# - GitHub Actions equivalents of Jenkins post conditions
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-with-post-actions:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Main build step
+        run: echo "hello"
+      
+      - name: Additional build steps
+        run: |
+          echo "Running main build logic..."
+          # Add your build steps here
+      
+      # Post conditions - these run based on job status
+      # Note: In GitHub Actions, these must be separate steps with conditionals
+      
+      - name: Always run (equivalent to post { always })
+        if: always()
+        run: echo "I AM ALWAYS first"
+      
+      - name: Run on changed (approximation)
+        if: always()
+        run: |
+          echo "CHANGED is run second"
+          # GitHub Actions doesn't have exact equivalent to Jenkins 'changed'
+          # You can compare commits or use caching to detect changes
+      
+      - name: Run on success
+        if: success()
+        run: echo "SUCCESS runs when all previous steps succeed"
+      
+      - name: Run on failure
+        if: failure()
+        run: echo "FAILURE runs when any previous step fails"
+      
+      - name: Run on cancelled
+        if: cancelled()
+        run: echo "CANCELLED runs when workflow is cancelled"
+      
+      - name: Cleanup (always runs)
+        if: always()
+        run: |
+          echo "Performing cleanup operations..."
+          # Cleanup code here
+
+  # Demonstrating job-level status checks
+  notify-on-completion:
+    needs: build-with-post-actions
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check job result
+        run: |
+          echo "Previous job status: ${{ needs.build-with-post-actions.result }}"
+          
+          if [ "${{ needs.build-with-post-actions.result }}" == "success" ]; then
+            echo "Build was successful!"
+          elif [ "${{ needs.build-with-post-actions.result }}" == "failure" ]; then
+            echo "Build failed!"
+          else
+            echo "Build status: ${{ needs.build-with-post-actions.result }}"
+          fi
