@@ -11,6 +11,9 @@ on:
     branches:
       - 'QA_*'
 
+permissions:
+  contents: read
+
 jobs:
   android-build:
     runs-on: ubuntu-latest

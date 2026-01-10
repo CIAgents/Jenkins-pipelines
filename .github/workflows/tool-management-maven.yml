@@ -25,6 +25,9 @@ on:
           - 'UNSTABLE'
           - 'ABORTED'
 
+permissions:
+  contents: read
+
 jobs:
   # Example: toolsInStage.groovy - Stage-specific tool configuration
   tools-in-stage:

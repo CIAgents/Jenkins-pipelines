@@ -13,6 +13,9 @@ on:
       - main
       - master
 
+permissions:
+  contents: read
+
 jobs:
   msbuild:
     runs-on: windows-latest

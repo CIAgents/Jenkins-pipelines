@@ -10,6 +10,9 @@ on:
       - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   # Example: pushGitRepo.groovy - Push tags and commits with credentials
   git-push-example:

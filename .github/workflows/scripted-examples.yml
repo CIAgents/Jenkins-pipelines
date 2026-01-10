@@ -14,6 +14,9 @@ on:
       - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   # Example: jobs_in_parallel.groovy - Parallel job execution
   parallel-jobs-example:
