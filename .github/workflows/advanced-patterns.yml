@@ -1,0 +1,324 @@
+# Migrated from pipeline-examples/
+# Advanced scripted pipeline patterns
+# - gitcommit/gitcommit.groovy
+# - gitcommit_changeset/gitcommit_changeset.groovy
+# - push-git-repo/pushGitRepo.groovy
+# - archive-build-output-artifacts/ArchiveBuildOutputArtifacts.groovy
+# - unstash-different-dir/unstashDifferentDir.groovy
+# - load-from-file/pipeline.groovy (and related files)
+
+name: Advanced Pipeline Patterns
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ========================================
+  # Git Commit and Push
+  # From: gitcommit/gitcommit.groovy and push-git-repo/pushGitRepo.groovy
+  # ========================================
+  git-commit-and-push:
+    name: Git Commit and Push Changes
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          # Need to use a PAT with write permissions for pushing
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+      
+      - name: Make changes
+        run: |
+          # Simulate making changes
+          echo "Build timestamp: $(date)" >> build-info.txt
+      
+      - name: Commit changes
+        id: commit
+        run: |
+          git add .
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes to commit"
+          else
+            git commit -m "Automated commit from GitHub Actions [skip ci]"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Push changes
+        if: steps.commit.outputs.has_changes == 'true'
+        run: |
+          git push origin HEAD:${{ github.ref }}
+
+  # ========================================
+  # Git Commit with Changeset Analysis
+  # From: gitcommit_changeset/gitcommit_changeset.groovy
+  # ========================================
+  git-changeset-analysis:
+    name: Analyze Git Changesets
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0  # Fetch full history for changeset analysis
+      
+      - name: Get commit information
+        id: commit_info
+        run: |
+          # Get commit SHA
+          COMMIT_SHA="${{ github.sha }}"
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          
+          # Get commit message
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+          
+          # Get commit author
+          AUTHOR=$(git log -1 --pretty=%an)
+          echo "Author: $AUTHOR"
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+      
+      - name: Get changed files
+        id: changed_files
+        run: |
+          # Get list of changed files
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # For push events, compare with previous commit
+            git diff --name-only HEAD~1 HEAD > changed_files.txt
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For PRs, compare with base branch
+            git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD > changed_files.txt
+          fi
+          
+          echo "Changed files:"
+          cat changed_files.txt
+          
+          # Count changes
+          CHANGE_COUNT=$(cat changed_files.txt | wc -l)
+          echo "change_count=$CHANGE_COUNT" >> $GITHUB_OUTPUT
+      
+      - name: Analyze file types
+        run: |
+          # Determine what types of files changed
+          if grep -q '\.java$' changed_files.txt; then
+            echo "Java files changed"
+          fi
+          if grep -q '\.js$' changed_files.txt; then
+            echo "JavaScript files changed"
+          fi
+          if grep -q '\.yml$\|\.yaml$' changed_files.txt; then
+            echo "YAML files changed"
+          fi
+      
+      - name: Upload changeset report
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: changeset-analysis
+          path: changed_files.txt
+
+  # ========================================
+  # Archive Build Artifacts
+  # From: archive-build-output-artifacts/ArchiveBuildOutputArtifacts.groovy
+  # ========================================
+  archive-build-artifacts:
+    name: Build and Archive Artifacts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Build application
+        run: |
+          # Simulate build process
+          mkdir -p build/output
+          mkdir -p build/reports
+          echo "Application binary" > build/output/app.bin
+          echo "Build report" > build/reports/report.html
+          echo "Test results" > build/reports/tests.xml
+      
+      - name: Archive build outputs
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: build-outputs
+          path: build/output/**
+      
+      - name: Archive build reports
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: build-reports
+          path: build/reports/**
+      
+      - name: Archive all build artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: all-build-artifacts
+          path: build/**
+
+  # ========================================
+  # Stash/Unstash Pattern (cross-job artifacts)
+  # From: unstash-different-dir/unstashDifferentDir.groovy
+  # ========================================
+  stash-artifacts:
+    name: Create and Stash Artifacts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create artifacts to stash
+        run: |
+          mkdir -p artifacts
+          echo "Stashed content" > artifacts/data.txt
+          echo "More data" > artifacts/info.txt
+      
+      - name: Stash artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: stashed-artifacts
+          path: artifacts/**
+
+  unstash-artifacts:
+    name: Unstash in Different Directory
+    needs: stash-artifacts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create target directory
+        run: |
+          mkdir -p different-location/subdir
+      
+      - name: Unstash artifacts to different directory
+        uses: actions/download-artifact@1c4c42d93d318e535e43cfe8bc2eaa7b7ff3855e # v4.1.3
+        with:
+          name: stashed-artifacts
+          path: different-location/subdir
+      
+      - name: Verify unstashed content
+        run: |
+          echo "Contents in different location:"
+          ls -la different-location/subdir
+          cat different-location/subdir/data.txt
+
+  # ========================================
+  # Load External Script Pattern
+  # From: load-from-file/pipeline.groovy
+  # ========================================
+  load-external-script:
+    name: Load and Execute External Script
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create external script
+        run: |
+          # Original Jenkins: load 'externalMethod.groovy'
+          # In GitHub Actions, we can source shell scripts or use composite actions
+          cat > external_method.sh << 'EOF'
+          #!/bin/bash
+          external_function() {
+            echo "This is an external function"
+            echo "Parameter 1: $1"
+            echo "Parameter 2: $2"
+          }
+          
+          another_function() {
+            echo "Another external function"
+            return 0
+          }
+          EOF
+          chmod +x external_method.sh
+      
+      - name: Load and use external script
+        run: |
+          # Source the external script
+          source ./external_method.sh
+          
+          # Call functions from external script
+          external_function "arg1" "arg2"
+          another_function
+          
+          echo "External script loaded and executed successfully"
+      
+      - name: Load from URL (similar to loadFromGithub.groovy)
+        run: |
+          # Original: load from GitHub URL
+          # Download and execute script from remote location
+          # curl -sSL https://raw.githubusercontent.com/user/repo/main/script.sh | bash
+          echo "Can load scripts from URLs if needed"
+
+  # ========================================
+  # External Method Call Pattern
+  # Shows how to modularize pipeline code
+  # ========================================
+  modular-pipeline:
+    name: Modular Pipeline with External Methods
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Define reusable functions
+        id: functions
+        run: |
+          # Create a script with reusable functions
+          cat > pipeline_functions.sh << 'EOF'
+          #!/bin/bash
+          
+          function run_build() {
+            echo "Running build..."
+            # Build logic here
+            return 0
+          }
+          
+          function run_tests() {
+            echo "Running tests..."
+            # Test logic here
+            return 0
+          }
+          
+          function deploy() {
+            local environment=$1
+            echo "Deploying to $environment..."
+            # Deploy logic here
+            return 0
+          }
+          EOF
+          chmod +x pipeline_functions.sh
+      
+      - name: Execute build stage
+        run: |
+          source ./pipeline_functions.sh
+          run_build
+      
+      - name: Execute test stage
+        run: |
+          source ./pipeline_functions.sh
+          run_tests
+      
+      - name: Execute deploy stage
+        if: github.ref == 'refs/heads/master'
+        run: |
+          source ./pipeline_functions.sh
+          deploy "production"

@@ -1,0 +1,223 @@
+# Migrated from declarative-examples/simple-examples/
+# Examples showing Docker integration patterns
+# - dockerfileDefault.groovy
+# - dockerfileAlternativeName.groovy
+# - environmentInStage.groovy
+# - environmentNonLiteral.groovy
+# - toolsInStage.groovy
+# - toolsBuildPluginParentPOM.groovy
+
+name: Docker and Environment Examples
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ========================================
+  # Default Dockerfile
+  # From: dockerfileDefault.groovy
+  # ========================================
+  dockerfile-default:
+    name: Build with Default Dockerfile
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@2b51285047da1547ffb1b2203d8be4c0af6b1f20 # v3.2.0
+      
+      - name: Build with Dockerfile in agent
+        run: |
+          # Original: agent { dockerfile true }
+          # Builds image from Dockerfile in repo root
+          docker build -t my-app:latest .
+      
+      - name: Run tests in container
+        run: |
+          docker run --rm my-app:latest echo "Tests pass"
+
+  # ========================================
+  # Alternative Dockerfile Name
+  # From: dockerfileAlternativeName.groovy
+  # ========================================
+  dockerfile-alternative:
+    name: Build with Custom Dockerfile
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@2b51285047da1547ffb1b2203d8be4c0af6b1f20 # v3.2.0
+      
+      - name: Build with alternative Dockerfile
+        run: |
+          # Original: agent { dockerfile { filename 'Dockerfile.build' } }
+          # Build from alternative Dockerfile name
+          if [ -f Dockerfile.build ]; then
+            docker build -f Dockerfile.build -t my-app:build .
+          else
+            echo "Dockerfile.build not found - using default"
+            docker build -t my-app:build .
+          fi
+      
+      - name: Run in custom container
+        run: |
+          docker run --rm my-app:build echo "Custom build"
+
+  # ========================================
+  # Environment Variables in Stage
+  # From: environmentInStage.groovy
+  # ========================================
+  environment-in-stage:
+    name: Stage-Scoped Environment Variables
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Stage with environment
+        env:
+          # Stage-specific environment variables
+          AN_ACCESS_KEY: ${{ secrets.AN_ACCESS_KEY }}
+        run: |
+          # Original: environment { AN_ACCESS_KEY = credentials('my-predefined-secret-text') }
+          echo "Access key is set (masked): $AN_ACCESS_KEY"
+          echo "This environment variable is scoped to this step"
+      
+      - name: Another stage without that environment
+        run: |
+          # AN_ACCESS_KEY is not available here
+          echo "AN_ACCESS_KEY is not available in this step"
+
+  # ========================================
+  # Non-Literal Environment Variables
+  # From: environmentNonLiteral.groovy
+  # ========================================
+  environment-non-literal:
+    name: Dynamic Environment Variables
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set dynamic environment variables
+        id: set_env
+        run: |
+          # Original used Groovy code to generate environment values
+          # Simulate reading from file or computing values
+          
+          # Read from file (original: readFile('file'))
+          if [ -f version.txt ]; then
+            VERSION=$(cat version.txt)
+          else
+            VERSION="1.0.0"
+          fi
+          
+          # Generate timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          
+          # Compute values
+          BUILD_TAG="build-${VERSION}-${TIMESTAMP}"
+          
+          # Set as environment variables for subsequent steps
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
+          echo "BUILD_TAG=$BUILD_TAG" >> $GITHUB_ENV
+          
+          # Also set as outputs
+          echo "build_tag=$BUILD_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Use dynamic environment variables
+        run: |
+          echo "Version: $VERSION"
+          echo "Timestamp: $TIMESTAMP"
+          echo "Build Tag: $BUILD_TAG"
+      
+      - name: Use from previous step output
+        run: |
+          echo "Build tag from output: ${{ steps.set_env.outputs.build_tag }}"
+
+  # ========================================
+  # Tools in Stage
+  # From: toolsInStage.groovy
+  # ========================================
+  tools-in-stage:
+    name: Stage-Specific Tools
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Stage with Maven tool
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Use Maven
+        run: |
+          # Original: tools { maven 'Maven 3.3.9' }
+          mvn --version
+          echo "Maven is available in this stage"
+      
+      - name: Stage with different JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Use different JDK
+        run: |
+          java -version
+          echo "Now using Java 17"
+
+  # ========================================
+  # Tools with Maven Build
+  # From: toolsBuildPluginParentPOM.groovy
+  # ========================================
+  tools-maven-build:
+    name: Maven Build with Parent POM
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Cache Maven packages
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      
+      - name: Build with Maven
+        run: |
+          # Original used Maven plugin with parent POM
+          mvn -N clean install
+          mvn clean install
+      
+      - name: Archive artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: maven-artifacts
+          path: target/*.jar
+          if-no-files-found: ignore

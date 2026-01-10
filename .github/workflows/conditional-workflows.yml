@@ -1,0 +1,145 @@
+# Migrated from declarative-examples/simple-examples/
+# Examples showing conditional execution patterns
+# - whenBranchMaster.groovy
+# - whenBranchNotMaster.groovy
+# - whenEnvVarCondition.groovy
+# - whenExpressionSkip.groovy
+# - whenLaterStages.groovy
+
+name: Conditional Workflow Examples
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ========================================
+  # When Branch is Master
+  # From: whenBranchMaster.groovy
+  # ========================================
+  when-branch-master:
+    name: Execute on Master Branch
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: First stage - always runs
+        run: echo "Hello"
+      
+      - name: Master branch stage - conditional
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "World"
+          echo "Heal it"
+
+  # ========================================
+  # When Branch is NOT Master
+  # From: whenBranchNotMaster.groovy
+  # ========================================
+  when-branch-not-master:
+    name: Execute on Non-Master Branches
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: First stage - always runs
+        run: echo "Hello"
+      
+      - name: Non-master branch stage - conditional
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo "World"
+          echo "Heal it"
+
+  # ========================================
+  # When Environment Variable Condition
+  # From: whenEnvVarCondition.groovy
+  # ========================================
+  when-env-var-condition:
+    name: Environment Variable Condition
+    runs-on: ubuntu-latest
+    
+    env:
+      # Set DEPLOY_TO environment variable
+      DEPLOY_TO: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: First stage - always runs
+        run: echo "Hello"
+      
+      - name: Deploy stage - only when DEPLOY_TO is production
+        if: env.DEPLOY_TO == 'production'
+        run: |
+          echo "Deploying to production"
+          echo "DEPLOY_TO is $DEPLOY_TO"
+
+  # ========================================
+  # When Expression Skip
+  # From: whenExpressionSkip.groovy
+  # ========================================
+  when-expression-skip:
+    name: Expression-Based Skip
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Determine if should skip
+        id: check
+        run: |
+          # Original Jenkins: when { expression { return false } }
+          # This would skip the stage
+          SHOULD_RUN=false
+          echo "should_run=$SHOULD_RUN" >> $GITHUB_OUTPUT
+      
+      - name: First stage - always runs
+        run: echo "Hello"
+      
+      - name: Conditional stage - skipped based on expression
+        if: steps.check.outputs.should_run == 'true'
+        run: echo "World - this will be skipped"
+
+  # ========================================
+  # When Conditions on Later Stages
+  # From: whenLaterStages.groovy
+  # ========================================
+  when-later-stages:
+    name: Conditional Later Stages
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Stage One - always runs
+        run: echo "Stage one"
+      
+      - name: Check condition for later stages
+        id: condition
+        run: |
+          # Set condition based on some logic
+          CONDITION_MET=true
+          echo "condition_met=$CONDITION_MET" >> $GITHUB_OUTPUT
+      
+      - name: Stage Two - conditional
+        if: steps.condition.outputs.condition_met == 'true'
+        run: echo "Stage two - condition met"
+      
+      - name: Stage Three - different condition
+        if: github.ref == 'refs/heads/master'
+        run: echo "Stage three - on master branch"

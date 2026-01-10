@@ -1,0 +1,169 @@
+# Migrated from pipeline-examples/
+# Examples showing parallel execution patterns
+# - parallel-from-list/parallelFromList.groovy
+# - jobs-in-parallel/jobs_in_parallel.groovy
+# - parallel-multiple-nodes/ParallelMultipleNodes.groovy
+
+name: Parallel Execution Examples
+
+on:
+  workflow_dispatch:  # Manual trigger
+
+permissions:
+  contents: read
+
+jobs:
+  # ========================================
+  # Parallel execution from list
+  # From: parallel-from-list/parallelFromList.groovy
+  # ========================================
+  parallel-from-list:
+    name: Parallel Echo ${{ matrix.item }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Original Jenkins used Groovy to transform list into parallel steps
+        # GitHub Actions uses matrix strategy for parallel execution
+        item: ['a', 'b', 'c', 'd']
+    
+    steps:
+      - name: Echo item
+        run: echo "${{ matrix.item }}"
+
+  # ========================================
+  # Jobs in parallel with parameters
+  # From: jobs-in-parallel/jobs_in_parallel.groovy
+  # ========================================
+  trigger-parallel-jobs:
+    name: Trigger Job ${{ matrix.index }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Original ran 4 jobs concurrently with different dummy parameters
+        index: [0, 1, 2, 3]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Simulate triggered job
+        run: |
+          # Original: build job: 'freestyle', parameters: [string(name: 'param1', value:'test_param'), string(name:'dummy', value: "${index}")]
+          # In GitHub Actions, you can trigger other workflows using workflow_dispatch
+          # or repository_dispatch events
+          echo "Running job with param1=test_param and dummy=${{ matrix.index }}"
+          
+          # To actually trigger another workflow, use:
+          # gh workflow run other-workflow.yml -f param1=test_param -f dummy=${{ matrix.index }}
+          # (requires GITHUB_TOKEN with appropriate permissions)
+
+  # ========================================
+  # Parallel execution on multiple nodes
+  # From: parallel-multiple-nodes/ParallelMultipleNodes.groovy
+  # ========================================
+  parallel-multiple-runners:
+    name: Parallel on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # Original Jenkins used different nodes
+        # GitHub Actions uses different runner types
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        task: ['task1', 'task2']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Run parallel task
+        run: |
+          echo "Running ${{ matrix.task }} on ${{ matrix.os }}"
+          # Add actual task commands here
+        shell: bash
+
+  # ========================================
+  # Parallel stages pattern
+  # Demonstrates parallelization with dependencies
+  # ========================================
+  parallel-with-dependencies:
+    name: Setup for Parallel Execution
+    runs-on: ubuntu-latest
+    outputs:
+      artifact_name: ${{ steps.setup.outputs.artifact_name }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup step
+        id: setup
+        run: |
+          echo "Setting up for parallel execution"
+          echo "artifact_name=build-artifact" >> $GITHUB_OUTPUT
+      
+      - name: Create artifact
+        run: |
+          echo "Build output" > output.txt
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: build-artifact
+          path: output.txt
+
+  parallel-worker-1:
+    name: Parallel Worker 1
+    needs: parallel-with-dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@1c4c42d93d318e535e43cfe8bc2eaa7b7ff3855e # v4.1.3
+        with:
+          name: ${{ needs.parallel-with-dependencies.outputs.artifact_name }}
+      
+      - name: Process in worker 1
+        run: |
+          echo "Worker 1 processing"
+          cat output.txt
+
+  parallel-worker-2:
+    name: Parallel Worker 2
+    needs: parallel-with-dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@1c4c42d93d318e535e43cfe8bc2eaa7b7ff3855e # v4.1.3
+        with:
+          name: ${{ needs.parallel-with-dependencies.outputs.artifact_name }}
+      
+      - name: Process in worker 2
+        run: |
+          echo "Worker 2 processing"
+          cat output.txt
+
+  parallel-worker-3:
+    name: Parallel Worker 3
+    needs: parallel-with-dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@1c4c42d93d318e535e43cfe8bc2eaa7b7ff3855e # v4.1.3
+        with:
+          name: ${{ needs.parallel-with-dependencies.outputs.artifact_name }}
+      
+      - name: Process in worker 3
+        run: |
+          echo "Worker 3 processing"
+          cat output.txt
+
+  finalize:
+    name: Finalize After Parallel
+    needs: [parallel-worker-1, parallel-worker-2, parallel-worker-3]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Finalize
+        run: echo "All parallel workers completed"
