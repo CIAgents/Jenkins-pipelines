@@ -1,0 +1,80 @@
+name: Android Build with Flavor from Branch
+
+# Migrated from: jenkinsfile-examples/android-build-flavor-from-branch/JenkinsFile
+# Original: Scripted pipeline for building Android with branch-based flavor selection
+
+on:
+  push:
+    branches: [ main, master, QA_** ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  android-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout with Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Extract Flavor from Branch
+        id: flavor
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Branch name: $BRANCH_NAME"
+          
+          # Extract flavor from branch name (QA_flavorname)
+          if [[ "$BRANCH_NAME" =~ ^QA_([a-z_]+)$ ]]; then
+            FLAVOR="${BASH_REMATCH[1]}"
+            # Capitalize first letter for Gradle task
+            FLAVOR_CAP="${FLAVOR^}"
+            echo "flavor=$FLAVOR_CAP" >> "$GITHUB_OUTPUT"
+            echo "Building flavor: $FLAVOR_CAP"
+          else
+            echo "flavor=Default" >> "$GITHUB_OUTPUT"
+            echo "No QA_ prefix found, using Default flavor"
+          fi
+      
+      - name: Build Android APK
+        run: |
+          ./gradlew clean assemble${{ steps.flavor.outputs.flavor }}Debug \
+            -PBUILD_NUMBER=${{ github.run_number }}
+      
+      - name: Archive APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: app/build/outputs/apk/*.apk
+          retention-days: 30
+      
+      - name: Upload to Crashlytics/Fabric
+        env:
+          FABRIC_API_KEY: ${{ secrets.FABRIC_API_KEY }}
+          FABRIC_BUILD_SECRET: ${{ secrets.FABRIC_BUILD_SECRET }}
+        run: |
+          ./gradlew crashlyticsUploadDistribution${{ steps.flavor.outputs.flavor }}Debug \
+            -PBUILD_NUMBER=${{ github.run_number }}
+
+# Required Secrets (configure in repository settings):
+# - FABRIC_API_KEY: Firebase/Fabric API key
+# - FABRIC_BUILD_SECRET: Firebase/Fabric build secret
+
+# Notes on Android Build Conversion:
+# - Jenkins @NonCPS function -> Bash regex in run step
+# - Branch name from env.BRANCH_NAME -> github.ref_name
+# - Groovy regex matcher -> Bash regex with BASH_REMATCH
+# - archiveArtifacts -> actions/upload-artifact
+# - Build number from env.BUILD_NUMBER -> github.run_number

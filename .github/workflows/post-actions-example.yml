@@ -1,0 +1,66 @@
+name: Declarative Pipeline with Post Actions
+
+# Migrated from: declarative-examples/simple-examples/postInStage.groovy
+# Original: Declarative pipeline demonstrating post actions in stages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  hello-with-post-actions:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Hello Step
+        id: hello
+        run: |
+          echo "hello"
+          
+          # Script block equivalent
+          res="${MAKE_RESULT:-}"
+          if [ -n "$res" ]; then
+            echo "Setting build result $res"
+            # Note: GitHub Actions uses step outputs and job status
+          else
+            echo "All is well"
+          fi
+      
+      # Post: aborted - not directly supported, would need cancellation handling
+      
+      # Post: always - runs regardless of previous step status
+      - name: Stage Always (Post)
+        if: always()
+        run: echo "Stage 'Hello' finished"
+      
+      # Post: changed - check if status differs from previous run
+      # Note: This requires workflow_run event or external tracking
+      
+      # Post: failure - runs only if previous steps failed
+      - name: Stage Failure (Post)
+        if: failure()
+        run: echo "Stage FAILED"
+      
+      # Post: success - runs only if all previous steps succeeded
+      - name: Stage Success (Post)
+        if: success()
+        run: echo "Stage was Successful"
+      
+      # Post: unstable - not directly supported in GitHub Actions
+      # Equivalent: check for warnings or specific conditions
+      
+      # Pipeline-level post action
+      - name: Pipeline Always (Post)
+        if: always()
+        run: echo "Pipeline is done"
+
+# Notes on Post Action Conversion:
+# - always() -> if: always()
+# - success() -> if: success()
+# - failure() -> if: failure()
+# - aborted -> Requires workflow cancellation event handling
+# - unstable -> Custom logic based on test results or warnings
+# - changed -> Requires comparison with previous workflow run

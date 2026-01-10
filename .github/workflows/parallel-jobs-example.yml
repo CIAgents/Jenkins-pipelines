@@ -1,0 +1,60 @@
+name: Parallel Job Execution
+
+# Migrated from: pipeline-examples/jobs-in-parallel/jobs_in_parallel.groovy
+# Original: Scripted pipeline running jobs in parallel
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # Matrix strategy for parallel execution
+  parallel-jobs:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3]
+      fail-fast: false
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Run Parallel Job ${{ matrix.index }}
+        run: |
+          echo "Running job with index: ${{ matrix.index }}"
+          echo "Parameter param1: test_param"
+          echo "Dummy parameter: ${{ matrix.index }}"
+          
+          # Simulate the triggered job work
+          # In Jenkins, this triggered a separate job called 'freestyle'
+          # In GitHub Actions, this could trigger another workflow or do work directly
+          
+  # Alternative: Trigger another workflow (if needed)
+  # trigger-other-workflow:
+  #   needs: parallel-jobs
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Trigger Other Workflow
+  #       uses: actions/github-script@v7
+  #       with:
+  #         script: |
+  #           await github.rest.actions.createWorkflowDispatch({
+  #             owner: context.repo.owner,
+  #             repo: context.repo.repo,
+  #             workflow_id: 'other-workflow.yml',
+  #             ref: 'main',
+  #             inputs: {
+  #               param1: 'test_param'
+  #             }
+  #           })
+
+# Notes on Parallel Execution Conversion:
+# - Jenkins parallel branches -> GitHub Actions matrix strategy
+# - Matrix creates multiple job instances running in parallel
+# - fail-fast: false allows other jobs to continue if one fails
+# - Each matrix job gets a unique matrix.index value
+# - Jenkins 'build job' step -> Can use workflow_dispatch or repository_dispatch

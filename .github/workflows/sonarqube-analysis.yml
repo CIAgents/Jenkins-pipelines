@@ -1,0 +1,45 @@
+name: SonarQube Static Analysis
+
+# Migrated from: jenkinsfile-examples/sonarqube/Jenkinsfile
+# Original: Scripted pipeline with SonarQube analysis using Gradle
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  sonarqube-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          ./gradlew clean sonarqube \
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
+            -Dsonar.host.url="$SONAR_HOST_URL" \
+            -Dsonar.login="$SONAR_TOKEN"
+
+# Required Secrets (configure in repository settings):
+# - SONAR_TOKEN: SonarQube authentication token
+# - SONAR_HOST_URL: SonarQube server URL (e.g., https://sonarcloud.io)

@@ -1,0 +1,76 @@
+name: Node.js Build, Test, and Deploy with Docker
+
+# Migrated from: jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+# Original: Scripted pipeline with Docker build, test, deploy, and email notifications
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+      
+      - name: Test
+        env:
+          NODE_ENV: test
+        run: |
+          echo "Environment will be : $NODE_ENV"
+          node -v
+          npm prune
+          npm install
+          npm test
+      
+      - name: Build Docker Image
+        run: |
+          # ./dockerBuild.sh
+          echo "Docker build would run here"
+          # docker build -t myapp:${{ github.sha }} .
+      
+      - name: Deploy
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        run: |
+          echo "Push to Repo"
+          # ./dockerPushToRepo.sh
+          echo "SSH to web server and tell it to pull new image"
+          # ssh deploy@xxxxx.xxxxx.com running/xxxxxxx/dockerRun.sh
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "prune and cleanup"
+          npm prune
+          rm -rf node_modules
+      
+      - name: Send Success Email
+        if: success()
+        run: |
+          echo "Project build successful"
+          # Configure email notification action if needed
+          # Or use SMTP with secrets
+      
+      - name: Send Failure Email
+        if: failure()
+        run: |
+          echo "Project build failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Configure email notification action if needed
+
+# Required Secrets (configure in repository settings):
+# - DEPLOY_SSH_KEY: SSH private key for deployment server access
+# - DOCKER_USERNAME: Docker registry username
+# - DOCKER_PASSWORD: Docker registry password
+# - SMTP_USERNAME: Email notification username (optional)
+# - SMTP_PASSWORD: Email notification password (optional)
