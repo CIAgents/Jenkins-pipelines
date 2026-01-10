@@ -1,0 +1,47 @@
+name: Push Git Repository
+
+# Migrated from: pipeline-examples/push-git-repo/pushGitRepo.groovy
+# Original Jenkins pipeline: Scripted pipeline to push tags to git repository
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  push-git-tag:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tagging
+          token: ${{ secrets.GIT_PAT }}  # Personal Access Token with repo permissions
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Create and push tag (HTTPS)
+        env:
+          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+          GIT_PASSWORD: ${{ secrets.GIT_PASSWORD }}
+        run: |
+          git tag -a some_tag -m 'GitHub Actions'
+          git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${{ github.repository }} --tags
+      
+      # Alternative: SSH authentication method (disabled by default)
+      # To enable SSH method: change the condition below and configure GIT_SSH_PRIVATE_KEY secret
+      - name: Create and push tag (SSH)
+        if: ${{ false }}
+        run: |
+          # Setup SSH key from secrets
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          
+          git tag -a some_tag -m 'GitHub Actions'
+          git push git@github.com:${{ github.repository }} --tags

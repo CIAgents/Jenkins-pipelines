@@ -1,0 +1,72 @@
+name: Node.js Build Test Deploy Docker
+
+# Migrated from: jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+# Original Jenkins pipeline: Scripted pipeline with Node.js, Docker, and notifications
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    
+    env:
+      NODE_ENV: test
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Display Node version
+        run: node -v
+      
+      - name: Prune dependencies
+        run: npm prune
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Build Docker image
+        run: ./dockerBuild.sh
+      
+      - name: Push Docker image to repository
+        run: ./dockerPushToRepo.sh
+        # Note: Requires DOCKER_USERNAME and DOCKER_PASSWORD secrets
+      
+      - name: Deploy to web server
+        run: ssh deploy@xxxxx.xxxxx.com running/xxxxxxx/dockerRun.sh
+        # Note: Requires SSH_PRIVATE_KEY secret and proper SSH configuration
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          npm prune
+          rm -rf node_modules
+      
+      - name: Send success notification
+        if: success()
+        run: |
+          echo "Build successful - would send email here"
+          # Configure with email action if needed:
+          # uses: dawidd6/action-send-mail@v3
+        # Note: Configure email notifications using secrets:
+        # MAIL_FROM, MAIL_TO, MAIL_SERVER, etc.
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          echo "Build failed - would send email here"
+          # Configure with email action if needed:
+          # uses: dawidd6/action-send-mail@v3

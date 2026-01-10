@@ -1,0 +1,50 @@
+name: Post Conditions in Stage
+
+# Migrated from: declarative-examples/simple-examples/postInStage.groovy
+# Original Jenkins pipeline: Declarative pipeline with post conditions
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  MAKE_RESULT: ""  # Can be set to SUCCESS, FAILURE, UNSTABLE, etc.
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Hello
+        id: hello-step
+        continue-on-error: true
+        run: |
+          echo "hello"
+          
+          # Script blocks equivalent - check MAKE_RESULT
+          if [ -n "${{ env.MAKE_RESULT }}" ]; then
+            echo "Setting build result ${{ env.MAKE_RESULT }}"
+            exit 1  # Simulate failure if MAKE_RESULT is set
+          else
+            echo "All is well"
+          fi
+      
+      - name: Stage 'Hello' was Successful
+        if: steps.hello-step.outcome == 'success'
+        run: echo "Stage was Successful"
+      
+      - name: Stage 'Hello' FAILED
+        if: steps.hello-step.outcome == 'failure'
+        run: echo "Stage FAILED"
+      
+      - name: Stage 'Hello' finished
+        if: always()
+        run: echo "Stage 'Hello' finished"
+      
+      - name: Pipeline is done
+        if: always()
+        run: echo "Pipeline is done"

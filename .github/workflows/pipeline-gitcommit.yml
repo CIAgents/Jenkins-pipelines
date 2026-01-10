@@ -1,0 +1,29 @@
+name: Git Commit Info
+
+# Migrated from: pipeline-examples/gitcommit/gitcommit.groovy
+# Original Jenkins pipeline: Scripted pipeline to get git commit information
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  get-commit-info:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for git log
+      
+      - name: Get short commit hash
+        id: commit
+        run: |
+          SHORT_COMMIT=$(git log -n 1 --pretty=format:'%h')
+          echo "short=${SHORT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "Short commit: ${SHORT_COMMIT}"
+      
+      - name: Use commit hash
+        run: echo "The short commit hash is ${{ steps.commit.outputs.short }}"

@@ -1,0 +1,26 @@
+name: When Branch Not Master
+
+# Migrated from: declarative-examples/simple-examples/whenBranchNotMaster.groovy
+# Original Jenkins pipeline: Declarative pipeline with negated branch condition
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Hello
+        run: echo "Hello"
+      
+      - name: Branch Test - Only on non-master branches
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo "World"
+          echo "Heal it"

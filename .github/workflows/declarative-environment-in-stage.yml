@@ -1,0 +1,28 @@
+name: Environment Variables in Stage
+
+# Migrated from: declarative-examples/simple-examples/environmentInStage.groovy
+# Original Jenkins pipeline: Declarative pipeline with stage-scoped environment variables
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FOO: "PIPELINE"
+
+jobs:
+  environment-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Local stage with BAR variable
+        env:
+          BAR: "STAGE"
+        run: echo "FOO is $FOO and BAR is $BAR"
+      
+      - name: Global stage without BAR
+        run: echo "FOO is $FOO and BAR is $BAR"

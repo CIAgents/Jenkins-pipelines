@@ -1,0 +1,43 @@
+name: Slack Notification
+
+# Migrated from: pipeline-examples/slacknotify/slackNotify.groovy
+# Original Jenkins pipeline: Scripted pipeline with Slack webhook notification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  notify-slack:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Send Slack notification (native method)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          PAYLOAD='{
+            "text": "Build notification from GitHub Actions",
+            "channel": "#general",
+            "username": "github-actions",
+            "icon_emoji": ":github:"
+          }'
+          curl -X POST --data-urlencode "payload=${PAYLOAD}" ${SLACK_WEBHOOK_URL}
+      
+      # Alternative: Use Slack action
+      - name: Send Slack notification (using action)
+        if: false
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "Build notification from GitHub Actions",
+              "channel": "#general",
+              "username": "github-actions",
+              "icon_emoji": ":github:"
+            }

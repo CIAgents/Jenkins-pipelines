@@ -1,0 +1,26 @@
+name: When Branch Master
+
+# Migrated from: declarative-examples/simple-examples/whenBranchMaster.groovy
+# Original Jenkins pipeline: Declarative pipeline with branch condition
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Stage One
+        run: echo "Hello"
+      
+      - name: Evaluate Master - Only on master branch
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "World"
+          echo "Heal it"

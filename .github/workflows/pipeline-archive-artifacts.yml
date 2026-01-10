@@ -1,0 +1,36 @@
+name: Archive Build Output Artifacts
+
+# Migrated from: pipeline-examples/archive-build-output-artifacts/ArchiveBuildOutputArtifacts.groovy
+# Original Jenkins pipeline: Scripted pipeline to archive build artifacts
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-archive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Create build output
+        run: |
+          # Make the output directory
+          mkdir -p output
+          
+          # Write a useful file, which is needed to be archived
+          echo "This file is useful, need to archive it." > output/usefulfile.txt
+          
+          # Write a useless file, which is not needed to be archived
+          echo "This file is useless, no need to archive it." > output/uselessfile.md
+      
+      - name: Archive build output artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            output/*.txt
+            !output/*.md
