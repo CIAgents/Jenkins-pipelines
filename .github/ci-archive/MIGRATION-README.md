@@ -240,6 +240,17 @@ The following environment variables may need configuration:
 - Info-level warnings: 16 (shellcheck variable quoting recommendations)
 - Intentional patterns: 2 (constant false conditions for documentation)
 
+### CodeQL Security Scan
+
+**Tool:** CodeQL Actions Security Scan  
+**Status:** ✅ PASSED
+
+**Security Summary:**
+- Total alerts found: 0
+- Critical vulnerabilities: 0
+- All workflows include explicit `permissions: contents: read` blocks
+- GITHUB_TOKEN permissions properly scoped following least privilege principle
+
 **Output:**
 ```
 All workflows validated successfully.

@@ -11,7 +11,11 @@ on:
 env:
   FOO: "PIPELINE"
 
+permissions:
+  contents: read
+
 jobs:
+
   environment-test:
     runs-on: ubuntu-latest
     

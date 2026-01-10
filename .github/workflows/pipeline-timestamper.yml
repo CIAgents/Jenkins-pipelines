@@ -9,7 +9,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+
   timestamped-build:
     runs-on: ubuntu-latest
     

@@ -8,7 +8,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+
   get-commit-info:
     runs-on: ubuntu-latest
     

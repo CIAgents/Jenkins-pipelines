@@ -8,7 +8,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+
   push-git-tag:
     runs-on: ubuntu-latest
     

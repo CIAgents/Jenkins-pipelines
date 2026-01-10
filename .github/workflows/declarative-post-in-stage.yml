@@ -11,7 +11,11 @@ on:
 env:
   MAKE_RESULT: ""  # Can be set to SUCCESS, FAILURE, UNSTABLE, etc.
 
+permissions:
+  contents: read
+
 jobs:
+
   build:
     runs-on: ubuntu-latest
     
