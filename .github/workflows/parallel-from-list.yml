@@ -1,0 +1,44 @@
+name: Dynamic Parallel Execution from List
+
+# Migrated from: pipeline-examples/parallel-from-list/parallelFromList.groovy
+# Original: Scripted pipeline with parallel execution generated from a list
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  parallel-from-list:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        string: ["a", "b", "c", "d"]
+      fail-fast: false
+    
+    steps:
+      - name: Echo String ${{ matrix.string }}
+        run: echo "${{ matrix.string }}"
+
+# Original Jenkins Code:
+# def stringsToEcho = ["a", "b", "c", "d"]
+# def stepsForParallel = stringsToEcho.collectEntries {
+#     ["echoing ${it}" : transformIntoStep(it)]
+# }
+# parallel stepsForParallel
+# 
+# def transformIntoStep(inputString) {
+#     return {
+#         node {
+#             echo inputString
+#         }
+#     }
+# }
+
+# Notes on Dynamic Parallel Conversion:
+# - Groovy list with collectEntries -> GitHub Actions matrix strategy
+# - Matrix values can be any list of strings or objects
+# - Each matrix value creates a separate job instance
+# - fail-fast controls whether all jobs stop if one fails

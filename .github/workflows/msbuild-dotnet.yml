@@ -1,0 +1,49 @@
+name: MSBuild .NET Solution
+
+# Migrated from: jenkinsfile-examples/msbuild/Jenkinsfile
+# Original: Scripted pipeline for building .NET solutions with MSBuild
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  msbuild:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+      
+      - name: Restore NuGet Packages
+        run: nuget restore SolutionName.sln
+      
+      - name: Build Solution
+        run: |
+          msbuild SolutionName.sln `
+            /p:Configuration=Release `
+            /p:Platform="Any CPU" `
+            /p:ProductVersion=1.0.0.${{ github.run_number }}
+      
+      - name: Archive Build Output
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: ProjectName/bin/Release/**
+          retention-days: 30
+
+# Notes on MSBuild Conversion:
+# - Jenkins 'bat' command -> PowerShell run on windows-latest runner
+# - tool 'MSBuild' -> microsoft/setup-msbuild action
+# - env.BUILD_NUMBER -> github.run_number
+# - archive step -> actions/upload-artifact
+# - Windows-specific path separators handled automatically

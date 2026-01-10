@@ -1,0 +1,51 @@
+name: Git Commit Information
+
+# Migrated from: pipeline-examples/gitcommit/gitcommit.groovy
+# Original: Scripted pipeline extracting git commit information
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  git-commit-info:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate git commands
+      
+      - name: Get Commit Information
+        run: |
+          # Short commit hash (GitHub Actions provides this via context)
+          echo "Short commit from context: ${{ github.sha }}"
+          echo "Short commit (7 chars): ${GITHUB_SHA:0:7}"
+          
+          # Using git command (like original Jenkins pipeline)
+          shortCommit=$(git log -n 1 --pretty=format:'%h')
+          echo "Short commit from git: $shortCommit"
+          
+          # Additional git information available
+          echo "Full SHA: ${{ github.sha }}"
+          echo "Commit message: $(git log -1 --pretty=%B)"
+          echo "Author: $(git log -1 --pretty=%an)"
+          echo "Author email: $(git log -1 --pretty=%ae)"
+          echo "Commit date: $(git log -1 --pretty=%cd)"
+
+# GitHub Context Variables for Git Information:
+# - github.sha: Full commit SHA
+# - github.ref: Git reference (e.g., refs/heads/main)
+# - github.event.head_commit.message: Commit message (for push events)
+# - github.event.head_commit.author.name: Commit author
+# - github.actor: User who triggered the workflow
+
+# Notes on Git Information Conversion:
+# - Jenkins sh(returnStdout: true, script: "git ...").trim() 
+#   -> GitHub Actions: $(git ...) in bash or ${{ github.sha }}
+# - Many git values are available directly in github context
+# - For complex git operations, use git commands in run steps

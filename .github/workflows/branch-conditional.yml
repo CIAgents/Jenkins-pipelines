@@ -1,0 +1,42 @@
+name: Branch Conditional Execution
+
+# Migrated from: declarative-examples/simple-examples/whenBranchMaster.groovy
+# Original: Declarative pipeline with branch condition
+
+on:
+  push:
+    branches: [ main, master, develop, feature/** ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  always-run:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Stage One
+        run: echo "Hello"
+  
+  master-only:
+    runs-on: ubuntu-latest
+    # Only run on master/main branch
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Evaluate Master
+        run: |
+          echo "World"
+          echo "Heal it"
+
+# Notes on Branch Condition Conversion:
+# - Jenkins 'when { branch "master" }' -> GitHub Actions 'if: github.ref == "refs/heads/master"'
+# - Can use job-level or step-level conditions
+# - github.ref contains the full ref (refs/heads/branch-name)
+# - For pattern matching: startsWith(github.ref, 'refs/heads/feature/')

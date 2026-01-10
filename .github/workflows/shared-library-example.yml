@@ -1,0 +1,70 @@
+name: Shared Library Pattern - Standard Build
+
+# Migrated from: global-library-examples/global-function/Jenkinsfile and standardBuild.groovy
+# Original: Jenkins shared library function called from Jenkinsfile
+# Expanded inline as GitHub Actions doesn't have direct shared library equivalent
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  standard-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Main Build Stage
+        uses: docker://golang:1.5.0
+        with:
+          entrypoint: /bin/sh
+          args: -c "go version && go build -v hello-world.go"
+      
+      - name: Post Build Stage
+        run: |
+          ls -l
+          ./hello-world
+
+# Original Shared Library Code (standardBuild.groovy):
+# def call(body) {
+#     def config = [:]
+#     body.resolveStrategy = Closure.DELEGATE_FIRST
+#     body.delegate = config
+#     body()
+#     stage 'checkout'
+#     node {
+#         checkout scm
+#         stage 'main'
+#         docker.image(config.environment).inside {
+#             sh config.mainScript
+#         }
+#         stage 'post'
+#         sh config.postScript
+#     }
+# }
+
+# Original Usage (Jenkinsfile):
+# standardBuild {
+#     environment = 'golang:1.5.0'
+#     mainScript = '''
+# go version
+# go build -v hello-world.go
+# '''
+#     postScript = '''
+# ls -l
+# ./hello-world
+# '''
+# }
+
+# Notes on Shared Library Conversion:
+# - Jenkins shared libraries -> GitHub Actions reusable workflows or composite actions
+# - Groovy closures -> YAML workflow inputs
+# - Dynamic configuration -> Workflow inputs with defaults
+# - For this example, expanded inline since it's simple
+# - For complex shared libraries, create reusable workflows in .github/workflows/
+# - Or create composite actions in separate repositories
