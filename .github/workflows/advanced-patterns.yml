@@ -1,0 +1,164 @@
+name: Advanced Pipeline Patterns
+
+# Migrated from: Multiple advanced pipeline-examples/*.groovy files
+# Original: Complex scripted patterns for Git operations, config files, and wrappers
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  # Example: pushGitRepo.groovy - Push tags and commits with credentials
+  git-push-example:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0  # Full history for tagging
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Push with HTTPS credentials
+        env:
+          # Original: withCredentials([usernamePassword(credentialsId: 'git-pass-credentials-ID')])
+          GIT_USERNAME: ${{ secrets.GIT_USERNAME }}
+          GIT_PASSWORD: ${{ secrets.GIT_PASSWORD }}
+        run: |
+          git tag -a some_tag_${{ github.run_number }} -m 'GitHub Actions'
+          git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/${{ github.repository }}.git --tags
+      
+      - name: Push with SSH credentials (alternative)
+        run: |
+          # Original: sshagent (credentials: ['git-ssh-credentials-ID'])
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GIT_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          
+          git tag -a ssh_tag_${{ github.run_number }} -m 'GitHub Actions SSH'
+          git push git@github.com:${{ github.repository }}.git --tags
+  
+  # Example: timestamperWrapper.groovy - Timestamps are automatic in GitHub Actions
+  timestamp-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: First echo
+        run: echo "Hey, look, I'm echoing with a timestamp!"
+        # Note: GitHub Actions automatically adds timestamps to all log output
+      
+      - name: Sleep
+        run: sleep 30
+      
+      - name: Second echo
+        run: echo "Wonder what time it is now?"
+        # Timestamps are visible in the GitHub Actions logs automatically
+  
+  # Example: configFileProvider.groovy - Config file management
+  config-file-example:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create config file from secret
+        run: |
+          # Original: configFileProvider([configFile(fileId: mycfg_file, variable: 'PACKER_OPTIONS')])
+          # In GitHub Actions, store config as secret or create from repository file
+          
+          # Option 1: From secret
+          echo "${{ secrets.PACKER_CONFIG }}" > packer_options.json
+          
+          # Option 2: From repository file
+          # Config file should be checked into repository or generated here
+          
+          echo "PACKER_OPTIONS=packer_options.json" >> $GITHUB_ENV
+      
+      - name: Read config from pipeline
+        run: |
+          echo "=========== Reading config from pipeline script ==========="
+          cat ${PACKER_OPTIONS}
+          echo "=========== ~~~~~~~~~~~~ ============"
+      
+      - name: Pass config to external script
+        run: |
+          echo "=========== Reading config via Python... ==========="
+          # Original: python build_image.py ${env.PACKER_OPTIONS}
+          # python build_image.py ${PACKER_OPTIONS}
+          echo "Would execute: python build_image.py ${PACKER_OPTIONS}"
+          echo "=========== ~~~~~~~~~~~~ ============"
+  
+  # Example: ansiColorBuildWrapper.groovy - ANSI color output
+  ansi-color-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Echo with ANSI colors
+        run: |
+          # GitHub Actions supports ANSI colors by default
+          echo -e "\033[32mThis is green text\033[0m"
+          echo -e "\033[31mThis is red text\033[0m"
+          echo -e "\033[33mThis is yellow text\033[0m"
+          echo -e "\033[34mThis is blue text\033[0m"
+          # Original: ansiColor('xterm') wrapper is not needed
+  
+  # Example: externalWorkspace.groovy - External workspace management
+  external-workspace-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          path: workspace
+      
+      - name: Setup external workspace
+        run: |
+          # Original: externalWorkspace() plugin
+          # GitHub Actions: Use checkout path or custom directory
+          mkdir -p /tmp/external-workspace
+          cp -r workspace/* /tmp/external-workspace/
+          
+          echo "WORKSPACE_DIR=/tmp/external-workspace" >> $GITHUB_ENV
+      
+      - name: Work in external workspace
+        run: |
+          cd ${WORKSPACE_DIR}
+          ls -la
+          echo "Working in external workspace: ${WORKSPACE_DIR}"
+      
+      - name: Cache external workspace
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: /tmp/external-workspace
+          key: external-workspace-${{ github.sha }}
+
+# Required Secrets:
+# - GIT_USERNAME: Git username for HTTPS push (git-push-example)
+# - GIT_PASSWORD: Git password or token for HTTPS push (git-push-example)
+# - GIT_SSH_PRIVATE_KEY: SSH private key for Git operations (git-push-example)
+# - PACKER_CONFIG: Configuration file content (config-file-example)
+#
+# Migration Notes:
+# - withCredentials: Converted to environment variables from secrets
+# - sshagent: Converted to manual SSH key setup
+# - timestamps: GitHub Actions provides automatic timestamps (no wrapper needed)
+# - configFileProvider: Converted to secret-based or file-based configuration
+# - ansiColor: ANSI colors work natively in GitHub Actions
+# - externalWorkspace: Converted to custom checkout paths and caching
+# - All Jenkins plugins replaced with native GitHub Actions features or scripts

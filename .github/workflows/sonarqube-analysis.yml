@@ -1,0 +1,77 @@
+name: SonarQube Analysis
+
+# Migrated from: jenkinsfile-examples/sonarqube/Jenkinsfile
+# Original: Scripted pipeline with SonarQube analysis using Gradle
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          # Shallow clones should be disabled for better analysis relevance
+          fetch-depth: 0
+      
+      - name: Setup JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Cache SonarQube packages
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      
+      - name: Cache Gradle packages
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Run Gradle Clean and SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          ./gradlew clean sonarqube \
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
+            -Dsonar.host.url=$SONAR_HOST_URL \
+            -Dsonar.login=$SONAR_TOKEN
+      
+      - name: SonarQube Quality Gate Check
+        uses: sonarsource/sonarqube-quality-gate-action@f9fe214a5be5769c40619de2fff2726c36d2d5eb # v1.3.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+# Required Secrets:
+# - SONAR_TOKEN: SonarQube authentication token (equivalent to Jenkins SONAR_PSW)
+# - SONAR_HOST_URL: SonarQube server URL (e.g., https://sonarqube.example.com)
+#
+# Note: Original Jenkins used credentials('sonar') with username/password binding
+# GitHub Actions uses token-based authentication which is more secure
