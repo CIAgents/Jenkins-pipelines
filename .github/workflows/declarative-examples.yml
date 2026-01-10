@@ -1,0 +1,176 @@
+name: Declarative Pipeline Examples
+
+# Migrated from: Multiple declarative-examples/simple-examples/*.groovy files
+# Original: Various declarative pipeline syntax examples demonstrating features
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  schedule:
+    # Migrated from: propertiesOptionsandTriggers.groovy - cron('@daily')
+    - cron: '0 0 * * *'  # Daily at midnight
+  workflow_dispatch:
+    inputs:
+      flag:
+        description: 'Boolean flag parameter'
+        required: false
+        default: 'true'
+        type: boolean
+      some_string:
+        description: 'String parameter'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # Example: credentialsUsernamePassword.groovy
+  credentials-example:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Use credentials
+        env:
+          # Original: FOO = credentials("FOOcredentials")
+          # Creates FOO, FOO_USR, FOO_PSW environment variables
+          FOO_USR: ${{ secrets.FOO_USERNAME }}
+          FOO_PSW: ${{ secrets.FOO_PASSWORD }}
+        run: |
+          # Credential values are masked in logs
+          echo "FOO_USR is $FOO_USR"
+          echo "FOO_PSW is ***"  # Password masked
+          
+          # Write to files
+          mkdir -p combined
+          echo "$FOO_USR:$FOO_PSW" > combined/foo.txt
+          echo "$FOO_PSW" > foo_psw.txt
+          echo "$FOO_USR" > foo_usr.txt
+      
+      - name: Archive credential files
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: credential-files
+          path: '**/*.txt'
+  
+  # Example: environmentInStage.groovy
+  environment-example:
+    runs-on: ubuntu-latest
+    
+    env:
+      # Pipeline-level environment variable
+      FOO: "PIPELINE"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Local stage with stage-specific environment
+        env:
+          # Stage-level environment variable
+          BAR: "STAGE"
+        run: echo "FOO is $FOO and BAR is $BAR"
+      
+      - name: Global stage (no BAR variable)
+        run: echo "FOO is $FOO and BAR is $BAR"
+  
+  # Example: whenBranchMaster.groovy
+  branch-conditional-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Always run
+        run: echo "Hello"
+      
+      - name: Only on master branch
+        if: github.ref == 'refs/heads/master'
+        run: |
+          echo "World"
+          echo "Heal it"
+  
+  # Example: postConditionOrder.groovy
+  post-conditions-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Main step
+        run: echo "hello"
+      
+      - name: Always runs
+        if: always()
+        run: echo "I AM ALWAYS first"
+      
+      - name: Success condition
+        if: success()
+        run: echo "SUCCESS runs on success"
+      
+      - name: Failure condition
+        if: failure()
+        run: echo "FAILURE runs on failure"
+  
+  # Example: dockerfileDefault.groovy
+  dockerfile-agent-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Build and run in Dockerfile container
+        run: |
+          # Original: agent { dockerfile { args "-v /tmp:/tmp -p 8000:8000" } }
+          docker build -t pipeline-dockerfile .
+          docker run -v /tmp:/tmp -p 8000:8000 pipeline-dockerfile sh -c "
+            cat /hi-there || echo 'File not found'
+            echo 'The answer is 42'
+          "
+  
+  # Example: propertiesOptionsandTriggers.groovy
+  options-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5  # Original: timeout(time: 5, unit: 'MINUTES')
+    concurrency:
+      # Original: disableConcurrentBuilds()
+      group: options-example
+      cancel-in-progress: false
+    
+    steps:
+      # Original: skipDefaultCheckout(true) - checkout is explicit
+      - name: Manual checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Run example commands
+        run: |
+          echo "hello"
+          test -f Jenkinsfile || echo "Jenkinsfile not found (expected in migration)"
+
+# Required Secrets (for credentials-example job):
+# - FOO_USERNAME: Username for credential binding example
+# - FOO_PASSWORD: Password for credential binding example
+#
+# Migration Notes:
+# - buildDiscarder: Converted to GitHub Actions retention policies (set at workflow/repo level)
+# - timestamps: GitHub Actions provides automatic timestamps in logs
+# - parameters: Converted to workflow_dispatch inputs
+# - triggers.cron: Converted to schedule with cron syntax
+# - when.branch: Converted to if conditions with github.ref
+# - post conditions: Converted to if: always()/success()/failure()
+# - agent.dockerfile: Converted to docker build and run commands
+# - environment variables: Pipeline-level = env:, Stage-level = step env:

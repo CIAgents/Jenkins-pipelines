@@ -1,0 +1,185 @@
+name: Tool Management and Maven Examples
+
+# Migrated from: Multiple examples showing tool management, Maven builds, and JDK configuration
+# Original: toolsInStage.groovy, postInStage.groovy, mavenAndJdkSpecificVersion.groovy
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      make_result:
+        description: 'Build result to simulate (leave empty for success)'
+        required: false
+        type: choice
+        default: 'SUCCESS'
+        options:
+          - 'SUCCESS'
+          - 'FAILURE'
+          - 'UNSTABLE'
+          - 'ABORTED'
+
+permissions:
+  contents: read
+
+jobs:
+  # Example: toolsInStage.groovy - Stage-specific tool configuration
+  tools-in-stage:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup Maven tool for stage
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup specific Maven version
+        run: |
+          # Original: tools { maven "apache-maven-3.0.1" }
+          MAVEN_VERSION=3.0.1
+          wget https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
+          tar xzf apache-maven-${MAVEN_VERSION}-bin.tar.gz
+          echo "$(pwd)/apache-maven-${MAVEN_VERSION}/bin" >> $GITHUB_PATH
+      
+      - name: Verify Maven version
+        run: |
+          mvn --version
+          echo "hello"
+  
+  # Example: postInStage.groovy - Post conditions in stages
+  post-in-stage:
+    runs-on: ubuntu-latest
+    env:
+      MAKE_RESULT: ${{ github.event.inputs.make_result }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Hello stage
+        id: hello
+        continue-on-error: true
+        run: |
+          echo "hello"
+          
+          # Original: Groovy script block checking MAKE_RESULT
+          if [ -n "$MAKE_RESULT" ]; then
+            echo "Setting build result ${MAKE_RESULT}"
+            if [ "$MAKE_RESULT" = "FAILURE" ]; then
+              exit 1
+            elif [ "$MAKE_RESULT" = "UNSTABLE" ]; then
+              echo "::warning::Build is unstable"
+            fi
+          else
+            echo "All is well"
+          fi
+      
+      - name: Stage post - Always
+        if: always()
+        run: echo "Stage 'Hello' finished"
+      
+      - name: Stage post - Success
+        if: steps.hello.outcome == 'success'
+        run: echo "Stage was Successful"
+      
+      - name: Stage post - Failure
+        if: steps.hello.outcome == 'failure'
+        run: echo "Stage FAILED"
+      
+      - name: Stage post - Cancelled
+        if: steps.hello.outcome == 'cancelled'
+        run: echo "Stage 'Hello' WAS ABORTED"
+      
+      - name: Pipeline post - Always
+        if: always()
+        run: echo "Pipeline is done"
+  
+  # Example: mavenAndJdkSpecificVersion.groovy - Specific Java and Maven versions
+  maven-jdk-specific-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup specific JDK version
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          # Original: JAVA_HOME=${ tool 'jdk-1.8.0_64bits' }
+          java-version: '8'
+          distribution: 'temurin'
+      
+      - name: Setup specific Maven version
+        run: |
+          # Original: PATH+MAVEN=${tool 'maven-3.2.1'}/bin
+          MAVEN_VERSION=3.2.1
+          wget https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
+          tar xzf apache-maven-${MAVEN_VERSION}-bin.tar.gz
+          echo "$(pwd)/apache-maven-${MAVEN_VERSION}/bin" >> $GITHUB_PATH
+      
+      - name: Display versions
+        run: |
+          echo "Java version:"
+          java -version
+          echo "Maven version:"
+          mvn --version
+      
+      - name: Maven clean deploy
+        run: |
+          # Original: mvn --batch-mode -V -U -e clean deploy -Dsurefire.useFile=false
+          mvn --batch-mode -V -U -e clean deploy -Dsurefire.useFile=false
+        # Flags explained:
+        # --batch-mode: Non-interactive mode (recommended for CI)
+        # -V: Display JDK and Maven versions
+        # -U: Force update of snapshots
+        # -e: Produce execution error messages
+        # -Dsurefire.useFile=false: Display test errors directly in logs
+  
+  # Additional example: Multi-version Maven build matrix
+  maven-matrix-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ['8', '11', '17']
+        maven: ['3.6.3', '3.8.6', '3.9.6']
+    
+    name: Build with Java ${{ matrix.java }} and Maven ${{ matrix.maven }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup JDK ${{ matrix.java }}
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          java-version: ${{ matrix.java }}
+          distribution: 'temurin'
+          cache: 'maven'
+      
+      - name: Setup Maven ${{ matrix.maven }}
+        run: |
+          wget https://archive.apache.org/dist/maven/maven-3/${{ matrix.maven }}/binaries/apache-maven-${{ matrix.maven }}-bin.tar.gz
+          tar xzf apache-maven-${{ matrix.maven }}-bin.tar.gz
+          echo "$(pwd)/apache-maven-${{ matrix.maven }}/bin" >> $GITHUB_PATH
+      
+      - name: Build with Maven
+        run: mvn --batch-mode -V clean verify
+
+# Migration Notes:
+# - tools { maven "version" }: Converted to actions/setup-java + custom Maven installation
+# - post in stage: Converted to step-level if conditions with outcome checks
+# - script blocks: Converted to shell scripts with equivalent logic
+# - currentBuild.result: Converted to exit codes and GitHub Actions status
+# - withEnv for JAVA_HOME: Converted to actions/setup-java which sets JAVA_HOME automatically
+# - tool() function: Converted to setup actions or manual installation scripts
+# - Matrix builds: Added as example showing multiple Java/Maven version combinations

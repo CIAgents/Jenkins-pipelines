@@ -1,0 +1,217 @@
+name: Artifactory Integration Examples
+
+# Migrated from: artifactory-gradle-build.groovy, artifactory-generic-upload-download.groovy
+# Original: Artifactory integration for Gradle builds and generic file upload/download
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Example: artifactoryGradleBuild.groovy - Gradle build with Artifactory
+  artifactory-gradle-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout project examples
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: 'jfrogdev/project-examples'
+          path: 'project-examples'
+      
+      - name: Setup JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.3
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Configure Artifactory for Gradle
+        run: |
+          # Original: rtGradle.deployer repo:'ext-release-local', server: server
+          # Original: rtGradle.resolver repo:'remote-repos', server: server
+          
+          cd project-examples/gradle-examples/4/gradle-example-ci-server/
+          
+          # Configure Gradle Artifactory plugin
+          jf gradle-config \
+            --repo-resolve=remote-repos \
+            --repo-deploy=ext-release-local \
+            --server-id-resolve=artifactory-server \
+            --server-id-deploy=artifactory-server
+      
+      - name: Build and publish to Artifactory
+        run: |
+          cd project-examples/gradle-examples/4/gradle-example-ci-server/
+          
+          # Original: rtGradle.run rootDir: "gradle-examples/4/gradle-example-ci-server/", buildFile: 'build.gradle', tasks: 'clean artifactoryPublish'
+          jf gradle clean artifactoryPublish --build-name=gradle-build --build-number=${{ github.run_number }}
+      
+      - name: Publish build info
+        run: |
+          # Original: server.publishBuildInfo buildInfo
+          jf rt build-publish gradle-build ${{ github.run_number }}
+  
+  # Example: artifactoryGenericUploadDownload.groovy - Generic file operations
+  artifactory-generic-operations:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout project examples
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          repository: 'jfrogdev/project-examples'
+          path: 'project-examples'
+      
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.3
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Download from Artifactory
+        run: |
+          # Original: Download spec with pattern "libs-snapshot-local/*.zip"
+          cat > download-spec.json << 'EOF'
+          {
+            "files": [
+              {
+                "pattern": "libs-snapshot-local/*.zip",
+                "target": "dependencies/",
+                "props": "p1=v1;p2=v2"
+              }
+            ]
+          }
+          EOF
+          
+          # Download files using spec
+          jf rt download --spec=download-spec.json --build-name=generic-build --build-number=${{ github.run_number }}
+      
+      - name: Upload to Artifactory
+        run: |
+          cd project-examples
+          
+          # Original: Upload spec with multiple patterns
+          cat > upload-spec.json << 'EOF'
+          {
+            "files": [
+              {
+                "pattern": "resources/Kermit.*",
+                "target": "libs-snapshot-local",
+                "props": "p1=v1;p2=v2"
+              },
+              {
+                "pattern": "resources/Frogger.*",
+                "target": "libs-snapshot-local"
+              }
+            ]
+          }
+          EOF
+          
+          # Upload files using spec
+          jf rt upload --spec=upload-spec.json --build-name=generic-build --build-number=${{ github.run_number }}
+      
+      - name: Publish build info
+        run: |
+          # Original: Merge and publish build info
+          jf rt build-publish generic-build ${{ github.run_number }}
+      
+      - name: Set build properties
+        run: |
+          # Add custom properties to build
+          jf rt build-add-git generic-build ${{ github.run_number }}
+  
+  # Additional example: Artifactory promotion
+  artifactory-promotion:
+    runs-on: ubuntu-latest
+    needs: [artifactory-gradle-build, artifactory-generic-operations]
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.3
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Promote build
+        run: |
+          # Promote build from snapshot to release repository
+          jf rt build-promote \
+            generic-build \
+            ${{ github.run_number }} \
+            libs-release-local \
+            --status="Released" \
+            --comment="Promoted via GitHub Actions" \
+            --source-repo="libs-snapshot-local"
+  
+  # Example: Artifactory Docker integration
+  artifactory-docker:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.3
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Docker login to Artifactory
+        run: |
+          # Login to Artifactory Docker registry
+          jf docker login ${{ secrets.ARTIFACTORY_DOCKER_REGISTRY }}
+      
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.ARTIFACTORY_DOCKER_REGISTRY }}/myapp:${{ github.sha }} .
+      
+      - name: Push Docker image to Artifactory
+        run: |
+          jf docker push ${{ secrets.ARTIFACTORY_DOCKER_REGISTRY }}/myapp:${{ github.sha }} \
+            --build-name=docker-build \
+            --build-number=${{ github.run_number }}
+      
+      - name: Publish Docker build info
+        run: |
+          jf rt build-docker-create docker-repo \
+            --build-name=docker-build \
+            --build-number=${{ github.run_number }}
+          
+          jf rt build-publish docker-build ${{ github.run_number }}
+
+# Required Secrets:
+# - ARTIFACTORY_URL: JFrog Artifactory server URL (e.g., https://mycompany.jfrog.io)
+# - ARTIFACTORY_USER: Artifactory username
+# - ARTIFACTORY_PASSWORD: Artifactory password or API token
+# - ARTIFACTORY_DOCKER_REGISTRY: Artifactory Docker registry URL (for docker example)
+#
+# Migration Notes:
+# - Artifactory.server: Converted to JFrog CLI setup with credentials
+# - Artifactory.newGradleBuild(): Converted to jf gradle-config
+# - rtGradle.deployer/resolver: Converted to jf gradle-config with repo parameters
+# - rtGradle.run: Converted to jf gradle with build tracking
+# - server.download/upload spec: Converted to jf rt download/upload with JSON specs
+# - buildInfo.append: JFrog CLI automatically merges build info
+# - server.publishBuildInfo: Converted to jf rt build-publish
+# - Build promotion: Added example using jf rt build-promote
+# - Properties: Supported in filespec JSON format
+# - Repository configurations: Must be pre-configured in Artifactory

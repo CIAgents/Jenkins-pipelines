@@ -1,0 +1,235 @@
+name: Additional Pipeline Patterns
+
+# Migrated from: Various pipeline-examples demonstrating stash/unstash, external scripts, and build info
+# Original: unstashDifferentDir.groovy, load-from-file examples, getBuildCause.groovy, etc.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Example: unstashDifferentDir.groovy - Stash and unstash across nodes
+  stash-unstash-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: First step - Create and stash files
+        run: |
+          # Original: node('first-node')
+          mkdir -p output
+          echo "Hey look, some text." > output/somefile
+      
+      - name: Upload artifact (stash equivalent)
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: first-stash
+          path: output/*
+          retention-days: 1
+      
+      - name: Download artifact (unstash equivalent)
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: first-stash
+          path: first-stash/output
+      
+      - name: Verify unstashed files
+        run: |
+          # Look, no output directory under the root!
+          ls -la $(pwd)
+          
+          # And look, output directory is there under first-stash!
+          ls -la $(pwd)/first-stash
+  
+  # Example: load-from-file - Load and execute external Groovy scripts
+  load-external-script:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create external method script
+        run: |
+          # Original: externalMethod.groovy with lookAtThis method
+          cat > externalMethod.sh << 'EOF'
+          #!/bin/bash
+          lookAtThis() {
+            echo "Look at this, ${1}!"
+          }
+          lookAtThis "$1"
+          EOF
+          chmod +x externalMethod.sh
+      
+      - name: Create external call script
+        run: |
+          # Original: externalCall.groovy with call method
+          cat > externalCall.sh << 'EOF'
+          #!/bin/bash
+          echo "This is the call method, ${1}!"
+          EOF
+          chmod +x externalCall.sh
+      
+      - name: Execute external scripts
+        run: |
+          # Original: def externalMethod = load("externalMethod.groovy")
+          # Original: externalMethod.lookAtThis("Steve")
+          ./externalMethod.sh "Steve"
+          
+          # Original: def externalCall = load("externalCall.groovy")
+          # Original: externalCall("Steve")
+          ./externalCall.sh "Steve"
+  
+  # Example: getBuildCause.groovy - Get build trigger information
+  build-cause-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Display build cause information
+        run: |
+          echo "Build triggered by: ${{ github.event_name }}"
+          echo "Triggered by user: ${{ github.actor }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "SHA: ${{ github.sha }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run Number: ${{ github.run_number }}"
+          
+          # Original: currentBuild.getBuildCauses()
+          case "${{ github.event_name }}" in
+            push)
+              echo "Cause: Push to branch"
+              ;;
+            pull_request)
+              echo "Cause: Pull request"
+              ;;
+            schedule)
+              echo "Cause: Scheduled/timer trigger"
+              ;;
+            workflow_dispatch)
+              echo "Cause: Manual trigger by ${{ github.actor }}"
+              ;;
+            *)
+              echo "Cause: ${{ github.event_name }}"
+              ;;
+          esac
+  
+  # Example: github-org-plugin - Access repository information
+  github-repo-info:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Display repository information
+        run: |
+          echo "Repository: ${{ github.repository }}"
+          echo "Owner: ${{ github.repository_owner }}"
+          echo "Repo name: ${{ github.event.repository.name }}"
+          echo "Default branch: ${{ github.event.repository.default_branch }}"
+          echo "Visibility: ${{ github.event.repository.visibility }}"
+          echo "Clone URL: ${{ github.event.repository.clone_url }}"
+          echo "SSH URL: ${{ github.event.repository.ssh_url }}"
+          echo "Description: ${{ github.event.repository.description }}"
+  
+  # Example: gitcommit_changeset.groovy - Get changeset information
+  git-changeset-example:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          fetch-depth: 0  # Full history for changeset analysis
+      
+      - name: Get changeset information
+        run: |
+          echo "=== Commit Information ==="
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Short SHA: ${GITHUB_SHA:0:7}"
+          
+          echo ""
+          echo "=== Commit Message ==="
+          git log -1 --pretty=format:'%s'
+          
+          echo ""
+          echo "=== Author Information ==="
+          git log -1 --pretty=format:'Author: %an <%ae>'
+          
+          echo ""
+          echo "=== Changed Files ==="
+          git diff-tree --no-commit-id --name-only -r ${{ github.sha }}
+          
+          echo ""
+          echo "=== Commit Stats ==="
+          git show --stat ${{ github.sha }}
+  
+  # Example: parallel-from-grep - Dynamic parallel execution from grep results
+  parallel-from-grep:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Find files and process
+        run: |
+          # Original: Groovy script using grep results to create parallel branches
+          # Find all .md files
+          FILES=$(find . -name "*.md" -type f)
+          
+          echo "Found files:"
+          echo "$FILES"
+          
+          # Process each file (would be parallel in matrix strategy)
+          for file in $FILES; do
+            echo "Processing: $file"
+            wc -l "$file"
+          done
+  
+  # Alternative: Matrix strategy for parallel-from-grep
+  parallel-grep-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # In real usage, generate this list dynamically or use job outputs
+        file_pattern: ['*.md', '*.txt', '*.yml', '*.yaml']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Process files matching pattern
+        run: |
+          echo "Searching for pattern: ${{ matrix.file_pattern }}"
+          find . -name "${{ matrix.file_pattern }}" -type f | while read file; do
+            echo "Processing: $file"
+            wc -l "$file" || echo "Cannot count lines in $file"
+          done
+
+# Migration Notes:
+# - stash/unstash: Converted to actions/upload-artifact and actions/download-artifact
+# - load() for Groovy scripts: Converted to shell scripts with source or direct execution
+# - currentBuild.getBuildCauses(): Converted to github.event_name and github context
+# - GitHub org plugin: Converted to github.repository and github.event.repository context
+# - Changeset operations: Converted to git commands with GitHub context variables
+# - Dynamic parallel from grep: Converted to matrix strategy or sequential processing
+# - Multiple nodes: GitHub Actions uses single runner per job; use multiple jobs for parallelism
+# - Artifact retention: Set to 1 day for stash-like behavior (temporary artifacts)

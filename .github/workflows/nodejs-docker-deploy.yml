@@ -1,0 +1,115 @@
+name: Node.js Build, Test, and Docker Deploy
+
+# Migrated from: jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+# Original: Scripted pipeline with Node.js build, testing, Docker build/push, deployment, and email notifications
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Display Node version
+        run: node -v
+      
+      - name: Test - Clean and Install Dependencies
+        env:
+          NODE_ENV: test
+        run: |
+          echo "Environment will be : $NODE_ENV"
+          npm prune
+          npm install
+      
+      - name: Run Tests
+        env:
+          NODE_ENV: test
+        run: npm test
+      
+      - name: Build Docker Image
+        run: |
+          # Original: ./dockerBuild.sh
+          # Note: Replace with actual docker build command or script
+          echo "Building Docker image..."
+          # docker build -t myapp:${{ github.sha }} .
+      
+      - name: Push Docker Image to Repository
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          # Original: ./dockerPushToRepo.sh
+          # Note: Replace with actual docker push command
+          echo "Pushing Docker image to repository..."
+          # docker push myapp:${{ github.sha }}
+        # Requires: DOCKER_USERNAME and DOCKER_PASSWORD secrets for authentication
+      
+      - name: Deploy to Server
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          # Original: ssh deploy@xxxxx.xxxxx.com running/xxxxxxx/dockerRun.sh
+          # Note: Configure SSH deployment with secrets
+          echo "Deploying to web server..."
+          # Setup SSH key from secrets and run deployment
+        # Requires: SSH_PRIVATE_KEY, SSH_HOST, SSH_USER secrets
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          npm prune
+          rm -rf node_modules
+      
+      - name: Send Success Email
+        if: success()
+        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'Project build successful'
+          body: 'Project build completed successfully'
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_FROM }}
+      
+      - name: Send Failure Email
+        if: failure()
+        uses: dawidd6/action-send-mail@2cea9617b09d79a095af21254fbcb7ae95903dde # v3.12.0
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 'Project build failed'
+          body: 'Project build error at ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
+          to: ${{ secrets.EMAIL_TO }}
+          from: ${{ secrets.EMAIL_FROM }}
+
+# Required Secrets:
+# - EMAIL_USERNAME: SMTP authentication username
+# - EMAIL_PASSWORD: SMTP authentication password
+# - EMAIL_FROM: Sender email address
+# - EMAIL_TO: Recipient email address
+# - DOCKER_USERNAME: Docker registry username (if pushing images)
+# - DOCKER_PASSWORD: Docker registry password (if pushing images)
+# - SSH_PRIVATE_KEY: SSH private key for deployment (if deploying)
+# - SSH_HOST: Target deployment host
+# - SSH_USER: SSH username for deployment

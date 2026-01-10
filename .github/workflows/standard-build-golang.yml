@@ -1,0 +1,52 @@
+name: Standard Build with Golang
+
+# Migrated from: global-library-examples/global-function/Jenkinsfile + standardBuild.groovy
+# Original: Jenkinsfile calling shared library function standardBuild (expanded inline)
+# Shared Library Function: standardBuild.groovy - builds code in Docker container with pre/post scripts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  standard-build:
+    runs-on: ubuntu-latest
+    container:
+      # Original shared library parameter: environment = 'golang:1.5.0'
+      image: golang:1.5.0
+    
+    steps:
+      # Expanded from standardBuild stage 'checkout'
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      # Expanded from standardBuild stage 'main'
+      # Original shared library parameter: mainScript
+      - name: Run Main Script
+        run: |
+          go version
+          go build -v hello-world.go
+      
+      # Expanded from standardBuild stage 'post'
+      # Original shared library parameter: postScript
+      - name: Run Post Script
+        run: |
+          ls -l
+          ./hello-world
+
+# Migration Notes:
+# - Shared library call: standardBuild { environment, mainScript, postScript }
+# - Expanded inline: All three stages (checkout, main, post) from standardBuild.groovy
+# - Docker execution: Converted docker.image().inside{} to container job
+# - Parameters passed as closure config converted to direct workflow steps
+# - Shared library eliminated the need for explicit node{} block
+# - Stage structure preserved: checkout → main → post
