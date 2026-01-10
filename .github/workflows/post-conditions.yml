@@ -1,0 +1,198 @@
+# Migrated from declarative-examples/simple-examples/
+# Post-condition examples showing different execution conditions
+# - postConditionOrder.groovy
+# - postInStage.groovy  
+# - postUnstable.groovy
+
+name: Post-Condition Examples
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  # ========================================
+  # Post Condition Order
+  # From: postConditionOrder.groovy
+  # Shows order: always, changed, then success/failure/unstable/aborted
+  # ========================================
+  post-condition-order:
+    name: Post Condition Execution Order
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Main step
+        run: echo "hello"
+      
+      - name: Always runs first
+        if: always()
+        run: echo "I AM ALWAYS first"
+      
+      - name: Changed condition (approximation)
+        if: always()
+        run: |
+          # GitHub Actions doesn't have direct "changed" condition
+          # This would need comparison with previous run status
+          echo "CHANGED is run second - approximated with always()"
+      
+      - name: On success
+        if: success()
+        run: echo "SUCCESS runs last"
+      
+      - name: On failure
+        if: failure()
+        run: echo "FAILURE runs last"
+      
+      # Note: GitHub Actions doesn't have "unstable" or "aborted" conditions
+      # unstable maps to a specific exit code pattern
+      # aborted maps to cancelled()
+      
+      - name: On cancelled
+        if: cancelled()
+        run: echo "CANCELLED (equivalent to aborted)"
+
+  # ========================================
+  # Post Actions in Stage
+  # From: postInStage.groovy
+  # ========================================
+  post-in-stage:
+    name: Post Actions Within Stage
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Build step
+        id: build
+        run: |
+          echo "Building..."
+          # Simulate build that might fail
+          exit 0
+      
+      - name: Test step
+        id: test
+        run: |
+          echo "Testing..."
+          exit 0
+      
+      # Post actions for build stage
+      - name: Post build - always
+        if: always() && steps.build.conclusion != 'skipped'
+        run: echo "Build stage completed (always)"
+      
+      - name: Post build - on success
+        if: success() && steps.build.conclusion == 'success'
+        run: echo "Build stage succeeded"
+      
+      - name: Post build - on failure
+        if: failure() && steps.build.conclusion == 'failure'
+        run: echo "Build stage failed"
+      
+      # Post actions for test stage
+      - name: Post test - always
+        if: always() && steps.test.conclusion != 'skipped'
+        run: echo "Test stage completed (always)"
+      
+      - name: Post test - on success
+        if: success() && steps.test.conclusion == 'success'
+        run: echo "Test stage succeeded"
+      
+      - name: Post test - on failure
+        if: failure() && steps.test.conclusion == 'failure'
+        run: echo "Test stage failed"
+
+  # ========================================
+  # Post Unstable Handling
+  # From: postUnstable.groovy
+  # ========================================
+  post-unstable:
+    name: Handle Unstable Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Build and test
+        id: build_test
+        continue-on-error: true
+        run: |
+          echo "Building and testing..."
+          # Simulate test failures (unstable in Jenkins terms)
+          # In Jenkins, currentBuild.result = 'UNSTABLE' 
+          # In GitHub Actions, this would be a step failure that we continue from
+          exit 1
+      
+      - name: Check if unstable
+        id: check_unstable
+        run: |
+          if [ "${{ steps.build_test.outcome }}" == "failure" ]; then
+            echo "unstable=true" >> $GITHUB_OUTPUT
+          else
+            echo "unstable=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Handle unstable build
+        if: steps.check_unstable.outputs.unstable == 'true'
+        run: |
+          echo "Build is unstable - some tests failed but build succeeded"
+          echo "Original Jenkins would mark currentBuild.result as 'UNSTABLE'"
+      
+      - name: Always run cleanup
+        if: always()
+        run: echo "Cleanup runs regardless of build status"
+
+  # ========================================
+  # Complex Post Condition Pattern
+  # Showing multiple post blocks with various conditions
+  # ========================================
+  complex-post-conditions:
+    name: Complex Post Conditions
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Main workflow steps
+        run: |
+          echo "Running main steps"
+          # Your main logic here
+    
+    # Using separate jobs for post-conditions to demonstrate
+    # the pattern of running cleanup/notification after main job
+  
+  post-always:
+    name: Post - Always
+    needs: complex-post-conditions
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Cleanup or notification
+        run: echo "This always runs after main job"
+
+  post-success:
+    name: Post - Success
+    needs: complex-post-conditions
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Success actions
+        run: echo "This runs only on success"
+
+  post-failure:
+    name: Post - Failure
+    needs: complex-post-conditions
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - name: Failure actions
+        run: |
+          echo "This runs only on failure"
+          # Send notifications, create issues, etc.

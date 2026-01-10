@@ -1,0 +1,209 @@
+# Migrated from declarative-examples/simple-examples/
+# Miscellaneous examples showing various Jenkins patterns
+# - propertiesOptionsandTriggers.groovy
+# - parametersBooleanRecursivePromotion.groovy
+# - scriptVariableAssignment.groovy
+# - stepsAndWrappers.groovy
+# - legacyMetaStepSyntax.groovy
+
+name: Miscellaneous Pattern Examples
+
+on:
+  # Migrated from propertiesOptionsandTriggers.groovy
+  schedule:
+    # Original: cron('H H * * *') - runs daily
+    # H in Jenkins means "hash" for distribution, using fixed time here
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  
+  push:
+    branches:
+      - '*'
+  
+  # Manual trigger with parameters
+  # From: parametersBooleanRecursivePromotion.groovy
+  workflow_dispatch:
+    inputs:
+      ENABLE_INTEGRATION_TEST:
+        description: 'Enable integration tests'
+        required: false
+        type: boolean
+        default: false
+      ENABLE_PERFORMANCE_TEST:
+        description: 'Enable performance tests'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # ========================================
+  # Properties, Options and Triggers
+  # From: propertiesOptionsandTriggers.groovy
+  # ========================================
+  properties-options-triggers:
+    name: Properties Options and Triggers
+    runs-on: ubuntu-latest
+    timeout-minutes: 60  # Original: timeout(time: 1, unit: 'HOURS')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Main steps with options
+        run: |
+          # Original options:
+          # - timeout(time: 1, unit: 'HOURS') -> job-level timeout-minutes
+          # - buildDiscarder(logRotator(...)) -> GitHub Actions handles retention
+          # - disableConcurrentBuilds() -> GitHub Actions concurrency groups
+          # - timestamps() -> GitHub Actions adds timestamps automatically
+          
+          echo "Running with configured options"
+          echo "Timestamps are automatic in GitHub Actions"
+          echo "Build retention is configured at repo level"
+
+  # Note: Concurrent builds control using concurrency groups
+  prevent-concurrent-builds:
+    name: Prevent Concurrent Builds
+    runs-on: ubuntu-latest
+    # Original: disableConcurrentBuilds()
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Long running task
+        run: |
+          echo "This job won't run concurrently for the same ref"
+          sleep 5
+
+  # ========================================
+  # Parameters with Boolean Values
+  # From: parametersBooleanRecursivePromotion.groovy
+  # ========================================
+  boolean-parameters:
+    name: Boolean Parameters Example
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Check integration test parameter
+        if: ${{ github.event.inputs.ENABLE_INTEGRATION_TEST == 'true' || github.event_name == 'push' }}
+        run: |
+          echo "Integration tests enabled"
+          # Run integration tests
+      
+      - name: Check performance test parameter
+        if: ${{ github.event.inputs.ENABLE_PERFORMANCE_TEST == 'true' }}
+        run: |
+          echo "Performance tests enabled"
+          # Run performance tests
+      
+      - name: Always run unit tests
+        run: |
+          echo "Unit tests run regardless of parameters"
+
+  # ========================================
+  # Script Variable Assignment
+  # From: scriptVariableAssignment.groovy
+  # ========================================
+  script-variable-assignment:
+    name: Script Variable Assignment
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Assign and use variables
+        id: vars
+        run: |
+          # Original used Groovy script block for variable assignment
+          # In GitHub Actions, use shell variables and outputs
+          
+          # Simple assignment
+          MY_VAR="Hello World"
+          echo "MY_VAR=$MY_VAR"
+          
+          # Conditional assignment
+          if [ "${{ github.ref }}" == "refs/heads/master" ]; then
+            DEPLOY_ENV="production"
+          else
+            DEPLOY_ENV="staging"
+          fi
+          echo "DEPLOY_ENV=$DEPLOY_ENV"
+          
+          # Make available to other steps
+          echo "deploy_env=$DEPLOY_ENV" >> $GITHUB_OUTPUT
+          echo "my_var=$MY_VAR" >> $GITHUB_ENV
+      
+      - name: Use assigned variables
+        run: |
+          echo "Using variable from env: $my_var"
+          echo "Using variable from output: ${{ steps.vars.outputs.deploy_env }}"
+
+  # ========================================
+  # Steps and Wrappers
+  # From: stepsAndWrappers.groovy
+  # ========================================
+  steps-and-wrappers:
+    name: Steps and Wrappers Example
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Wrapped steps
+        # Original used timeout wrapper and other wrappers
+        timeout-minutes: 10
+        run: |
+          echo "Steps running inside wrapper"
+          # Original: timeout(time: 10, unit: 'MINUTES') { }
+          # In GitHub Actions, use timeout-minutes at step level
+      
+      - name: Retry logic
+        uses: nick-fields/retry@7152eba30c6575329ac0576536151aca5a72780e # v3.0.0
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          command: |
+            echo "This step will retry on failure"
+            # Add command that might fail
+
+  # ========================================
+  # Legacy Meta Step Syntax
+  # From: legacyMetaStepSyntax.groovy
+  # ========================================
+  legacy-meta-steps:
+    name: Legacy Meta Step Syntax
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Archive using legacy syntax
+        run: |
+          # Create test files
+          echo "test content" > test-file.txt
+          mkdir -p output
+          echo "output content" > output/result.txt
+      
+      - name: Archive artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          # Original: archive 'test-file.txt'
+          name: legacy-artifacts
+          path: |
+            test-file.txt
+            output/**
+      
+      - name: Step with parameters
+        run: |
+          # Original used legacy meta-step syntax like: step([$class: 'SomePlugin', param: 'value'])
+          # In GitHub Actions, use equivalent actions or direct commands
+          echo "Using modern step syntax in GitHub Actions"

@@ -1,0 +1,230 @@
+# Migrated from multiple Jenkins pipeline examples for various language builds
+# - jenkinsfile-examples/android-build-flavor-from-branch/JenkinsFile
+# - jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+# - jenkinsfile-examples/msbuild/Jenkinsfile
+# - global-library-examples/global-function/Jenkinsfile (with standardBuild.groovy expanded inline)
+
+name: Language-Specific Builds
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  # ========================================
+  # Android Build (from android-build-flavor-from-branch/JenkinsFile)
+  # ========================================
+  android-build:
+    name: Android Build with Flavor
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          submodules: true
+      
+      - name: Set up JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Determine build flavor from branch
+        id: flavor
+        run: |
+          BRANCH_NAME="${{ github.ref_name }}"
+          echo "Branch name: $BRANCH_NAME"
+          
+          # Extract flavor from branch name (format: QA_{flavor})
+          if [[ $BRANCH_NAME =~ QA_([a-z_]+) ]]; then
+            FLAVOR="${BASH_REMATCH[1]}"
+            # Capitalize first letter for Gradle task
+            FLAVOR_CAPITALIZED="$(echo $FLAVOR | sed 's/^./\U&/')"
+            echo "flavor=$FLAVOR_CAPITALIZED" >> $GITHUB_OUTPUT
+          else
+            # Default flavor if pattern doesn't match
+            echo "flavor=Production" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Build APK
+        run: |
+          ./gradlew clean assemble${{ steps.flavor.outputs.flavor }}Debug -PBUILD_NUMBER=${{ github.run_number }}
+      
+      - name: Archive APK artifacts
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: android-apk-${{ steps.flavor.outputs.flavor }}
+          path: app/build/outputs/apk/*.apk
+      
+      - name: Upload to Crashlytics
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          ./gradlew crashlyticsUploadDistribution${{ steps.flavor.outputs.flavor }}Debug -PBUILD_NUMBER=${{ github.run_number }}
+
+  # ========================================
+  # Node.js Build (from nodejs-build-test-deploy-docker-notify/Jenkinsfile)
+  # ========================================
+  nodejs-build:
+    name: Node.js Build Test Deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
+        with:
+          node-version: '18'
+      
+      - name: Display Node version
+        run: node -v
+      
+      - name: Clean and install dependencies
+        run: |
+          npm prune
+          npm install
+      
+      - name: Run tests
+        env:
+          NODE_ENV: test
+        run: |
+          echo "Environment will be: $NODE_ENV"
+          npm test
+      
+      - name: Build Docker image
+        run: |
+          # Original: ./dockerBuild.sh
+          # Replace with actual docker build command or keep script
+          if [ -f ./dockerBuild.sh ]; then
+            chmod +x ./dockerBuild.sh
+            ./dockerBuild.sh
+          else
+            echo "dockerBuild.sh not found - skipping"
+          fi
+      
+      - name: Deploy - Push to Docker Registry
+        if: success()
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "Push to Repo"
+          # Original: ./dockerPushToRepo.sh
+          if [ -f ./dockerPushToRepo.sh ]; then
+            chmod +x ./dockerPushToRepo.sh
+            ./dockerPushToRepo.sh
+          else
+            echo "dockerPushToRepo.sh not found - skipping"
+          fi
+      
+      - name: Deploy to web server
+        if: success()
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          # Original: ssh deploy@xxxxx.xxxxx.com running/xxxxxxx/dockerRun.sh
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          
+          # SSH to server and run deployment script
+          # ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no deploy@$DEPLOY_HOST "running/xxxxxxx/dockerRun.sh"
+          echo "SSH deployment step - configure DEPLOY_SSH_KEY and DEPLOY_HOST secrets"
+      
+      - name: Cleanup
+        if: always()
+        run: |
+          echo 'prune and cleanup'
+          npm prune
+          rm -rf node_modules
+      
+      - name: Send success notification
+        if: success()
+        run: |
+          # Original sent email - replace with your notification system
+          echo "Build successful: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Example email action (requires configuration):
+          # - uses: dawidd6/action-send-mail@v3
+          #   with:
+          #     subject: "project build successful"
+          #     to: yyyyy@yyyy.com
+          #     from: xxxx@yyyyy.com
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          echo "Build failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          # Configure email action as needed
+
+  # ========================================
+  # MSBuild (.NET) (from msbuild/Jenkinsfile)
+  # ========================================
+  msbuild-dotnet:
+    name: MSBuild .NET Build
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@a21f25cd3998bf370fde17e3f1b4c12c175172f9 # v2.0.0
+      
+      - name: Restore NuGet packages
+        shell: cmd
+        run: nuget restore SolutionName.sln
+      
+      - name: Build solution
+        shell: cmd
+        run: msbuild SolutionName.sln /p:Configuration=Release /p:Platform="Any CPU" /p:ProductVersion=1.0.0.${{ github.run_number }}
+      
+      - name: Archive build output
+        uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+        with:
+          name: msbuild-release
+          path: ProjectName/bin/Release/**
+
+  # ========================================
+  # Go Build (from global-library-examples/global-function/Jenkinsfile)
+  # Shared library standardBuild.groovy expanded inline
+  # ========================================
+  go-build:
+    name: Go Build (Shared Library Expanded)
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.5.0
+    
+    steps:
+      # Stage: checkout (from standardBuild.groovy line 10-12)
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      # Stage: main (from standardBuild.groovy line 13-15)
+      # Using environment from Jenkinsfile: golang:1.5.0
+      # Using mainScript from Jenkinsfile
+      - name: Main build script
+        run: |
+          go version
+          go build -v hello-world.go
+      
+      # Stage: post (from standardBuild.groovy line 17-18)
+      # Using postScript from Jenkinsfile
+      - name: Post build script
+        run: |
+          ls -l
+          ./hello-world

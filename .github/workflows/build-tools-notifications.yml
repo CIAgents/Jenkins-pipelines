@@ -1,0 +1,339 @@
+# Migrated from pipeline-examples/
+# Build tool and notification patterns
+# - maven-and-jdk-specific-version/
+# - artifactory-maven-build/artifactoryMavenBuild.groovy
+# - artifactory-gradle-build/artifactoryGradleBuild.groovy
+# - artifactory-generic-upload-download/
+# - ansi-color-build-wrapper/AnsiColorBuildWrapper.groovy
+# - timestamper-wrapper/
+# - ircnotify-commandline/ircNotify.groovy
+# - slacknotify/
+# - configfile-provider-plugin/
+# - get-build-cause/getBuildCause.groovy
+# - external-workspace-manager/externalWorkspace.groovy
+# - trigger-job-on-all-nodes/triggerJobOnEveryNode.groovy
+
+name: Build Tools and Notifications
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  # ========================================
+  # Maven with Specific JDK Version
+  # From: maven-and-jdk-specific-version/
+  # ========================================
+  maven-specific-jdk:
+    name: Maven Build with Specific JDK
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up JDK 11
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Cache Maven packages
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      
+      - name: Build with Maven
+        run: |
+          mvn --version
+          # mvn clean install
+
+  # ========================================
+  # Artifactory Maven Build
+  # From: artifactory-maven-build/artifactoryMavenBuild.groovy
+  # ========================================
+  artifactory-maven:
+    name: Maven Build with Artifactory
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+      
+      - name: Configure Maven settings for Artifactory
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+        run: |
+          # Create Maven settings.xml with Artifactory configuration
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>artifactory</id>
+                <username>\${env.ARTIFACTORY_USERNAME}</username>
+                <password>\${env.ARTIFACTORY_PASSWORD}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+      
+      - name: Build and deploy to Artifactory
+        env:
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+        run: |
+          # Original used Artifactory plugin rtMaven
+          # mvn clean deploy -DaltDeploymentRepository=artifactory::default::$ARTIFACTORY_URL
+          echo "Maven build with Artifactory integration"
+      
+      - name: Publish build info to Artifactory
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.2
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USERNAME }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Upload to Artifactory
+        run: |
+          # jfrog rt upload "target/*.jar" "libs-release-local/"
+          echo "Upload artifacts to Artifactory"
+
+  # ========================================
+  # Artifactory Gradle Build
+  # From: artifactory-gradle-build/artifactoryGradleBuild.groovy
+  # ========================================
+  artifactory-gradle:
+    name: Gradle Build with Artifactory
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Set up JDK
+        uses: actions/setup-java@99b8673ff64fbf99d8d325f52d9a5bdedb8483e9 # v4.2.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Setup JFrog CLI
+        uses: jfrog/setup-jfrog-cli@9fe0f98bd45b19e6e931d457f4e98f8f84461fb5 # v4.1.2
+        env:
+          JF_URL: ${{ secrets.ARTIFACTORY_URL }}
+          JF_USER: ${{ secrets.ARTIFACTORY_USERNAME }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      
+      - name: Build with Gradle
+        run: |
+          # Original: rtGradle with Artifactory configuration
+          ./gradlew clean build
+      
+      - name: Upload to Artifactory
+        run: |
+          # jfrog rt upload "build/libs/*.jar" "libs-release-local/"
+          echo "Upload Gradle artifacts to Artifactory"
+
+  # ========================================
+  # Build Cause Detection
+  # From: get-build-cause/getBuildCause.groovy
+  # ========================================
+  detect-build-cause:
+    name: Detect Build Trigger Cause
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Determine build cause
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Triggered by: ${{ github.actor }}"
+          echo "Ref: ${{ github.ref }}"
+          
+          # Original Jenkins: currentBuild.getBuildCauses()
+          # GitHub Actions equivalent
+          case "${{ github.event_name }}" in
+            push)
+              echo "Build caused by push"
+              echo "Commit SHA: ${{ github.sha }}"
+              ;;
+            pull_request)
+              echo "Build caused by pull request"
+              echo "PR number: ${{ github.event.pull_request.number }}"
+              ;;
+            schedule)
+              echo "Build caused by schedule (cron)"
+              ;;
+            workflow_dispatch)
+              echo "Build manually triggered"
+              ;;
+            *)
+              echo "Build caused by: ${{ github.event_name }}"
+              ;;
+          esac
+
+  # ========================================
+  # ANSI Color Output
+  # From: ansi-color-build-wrapper/AnsiColorBuildWrapper.groovy
+  # ========================================
+  ansi-color-output:
+    name: ANSI Color Output
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Output with ANSI colors
+        run: |
+          # Original: ansiColor('xterm') wrapper
+          # GitHub Actions supports ANSI colors by default
+          echo -e "\033[32mGreen text - success\033[0m"
+          echo -e "\033[33mYellow text - warning\033[0m"
+          echo -e "\033[31mRed text - error\033[0m"
+          echo -e "\033[34mBlue text - info\033[0m"
+
+  # ========================================
+  # Slack Notification
+  # From: slacknotify/
+  # ========================================
+  slack-notifications:
+    name: Send Slack Notifications
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Run build
+        id: build
+        run: |
+          echo "Building application..."
+          # Your build steps here
+      
+      - name: Send Slack notification on success
+        if: success()
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          # Original: slackSend channel: '#builds', message: 'Build succeeded'
+          payload: |
+            {
+              "text": "Build succeeded: ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ Build *succeeded* for `${{ github.repository }}`\n*Branch:* ${{ github.ref_name }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Send Slack notification on failure
+        if: failure()
+        uses: slackapi/slack-github-action@70cd7be8e40a46e8b0eced40b0de447bdb42f68e # v1.26.0
+        with:
+          payload: |
+            {
+              "text": "Build failed: ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ Build *failed* for `${{ github.repository }}`\n*Branch:* ${{ github.ref_name }}\n*Commit:* ${{ github.sha }}\n*Author:* ${{ github.actor }}\n*URL:* ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # ========================================
+  # IRC Notification
+  # From: ircnotify-commandline/ircNotify.groovy
+  # ========================================
+  irc-notifications:
+    name: IRC Notifications
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Send IRC notification
+        if: always()
+        run: |
+          # Original used IRC notification plugin or command-line tools
+          # Install and use a tool like 'ii' or custom script
+          echo "IRC notification would be sent here"
+          # Example with netcat (if IRC server accessible):
+          # echo "PRIVMSG #channel :Build ${{ github.run_number }} completed" | nc irc.server.com 6667
+
+  # ========================================
+  # Config File Provider Pattern
+  # From: configfile-provider-plugin/
+  # ========================================
+  config-file-provider:
+    name: Use Configuration Files
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Create config file from secret
+        env:
+          CONFIG_CONTENT: ${{ secrets.CONFIG_FILE_CONTENT }}
+        run: |
+          # Original: configFileProvider with Jenkins managed files
+          # In GitHub Actions, store config in secrets and write to file
+          echo "$CONFIG_CONTENT" > config.properties
+          echo "Config file created"
+      
+      - name: Use configuration file
+        run: |
+          cat config.properties
+          # Use the config file in your build
+
+  # ========================================
+  # Trigger on All Nodes Pattern
+  # From: trigger-job-on-all-nodes/triggerJobOnEveryNode.groovy
+  # ========================================
+  trigger-on-multiple-runners:
+    name: Execute on Multiple Runners
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        # Original: triggered job on every available node
+        # GitHub Actions: use matrix to run on different runner types
+        runner: [ubuntu-latest, windows-latest, macos-latest]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      
+      - name: Execute on this runner
+        run: |
+          echo "Executing on ${{ matrix.runner }}"
+          # Original would run on every Jenkins node
+          # Here we run on every specified runner type
+        shell: bash
