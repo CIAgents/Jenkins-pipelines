@@ -1,0 +1,6 @@
+# Build artifacts
+actionlint
+
+# Documentation from actionlint tool (not part of this repo)
+docs/
+man/

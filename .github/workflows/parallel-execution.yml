@@ -1,0 +1,51 @@
+name: Parallel Execution Example
+
+# Migrated from: pipeline-examples/parallel-from-list/parallelFromList.groovy
+# This workflow demonstrates:
+# - Matrix strategy for parallel execution
+# - Dynamic parallel job execution
+# - Parameter passing between jobs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  # Strategy matrix allows parallel execution similar to Jenkins parallel
+  parallel-echo:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Equivalent to Jenkins' list of strings to echo in parallel
+        value: [a, b, c, d]
+    
+    steps:
+      - name: Echo value
+        run: echo "${{ matrix.value }}"
+      
+      - name: Process item
+        run: |
+          echo "Processing item: ${{ matrix.value }}"
+          # Add additional processing here
+
+  # Alternative approach: Using job dependencies for sequential-then-parallel
+  trigger-parallel-jobs:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        index: [0, 1, 2, 3]
+    
+    steps:
+      - name: Simulate parallel job trigger
+        run: |
+          echo "Running job with index: ${{ matrix.index }}"
+          echo "param1=test_param"
+          echo "dummy=${{ matrix.index }}"
+      
+      - name: Job execution
+        run: |
+          # Equivalent to Jenkins build job with parameters
+          echo "Job execution with parameters:"
+          echo "  - param1: test_param"
+          echo "  - dummy: ${{ matrix.index }}"

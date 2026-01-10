@@ -1,0 +1,64 @@
+name: Global Library Example
+
+# Migrated from: global-library-examples/global-function/Jenkinsfile
+# This workflow demonstrates:
+# - Converting Jenkins shared library calls to inline actions
+# - Docker-based build environment
+# - Multi-stage pipeline (checkout, main, post)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  standard-build:
+    runs-on: ubuntu-latest
+    
+    # Equivalent to Jenkins shared library "standardBuild" function
+    # Original library: workflowLibs.git/vars/standardBuild.groovy
+    # Expanded inline for GitHub Actions
+    
+    container:
+      # Equivalent to: docker.image('golang:1.5.0').inside
+      image: golang:1.5.0
+    
+    steps:
+      # Stage: checkout (equivalent to stage 'checkout')
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # Stage: main (equivalent to stage 'main')
+      - name: Main build script
+        run: |
+          # Original Jenkins shared library mainScript:
+          go version
+          go build -v hello-world.go
+      
+      # Stage: post (equivalent to stage 'post')
+      - name: Post build script
+        run: |
+          # Original Jenkins shared library postScript:
+          ls -l
+          ./hello-world
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hello-world-binary
+          path: hello-world
+          retention-days: 30
+
+  # Alternative: Using custom action (reusable workflow)
+  # This is the GitHub Actions equivalent of Jenkins shared libraries
+  call-reusable-workflow:
+    uses: ./.github/workflows/reusable-go-build.yml
+    with:
+      go-version: '1.5.0'
+      build-script: |
+        go version
+        go build -v hello-world.go
+      post-script: |
+        ls -l
+        ./hello-world
