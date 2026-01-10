@@ -5,7 +5,7 @@ triggering all of them in parallel.
 
 # Caveats
 
-* Calling other jobs is not the most idiomatic way to use the Worflow DSL, 
+* Calling other jobs is not the most idiomatic way to use the Workflow DSL, 
 however, the chance of re-using existing jobs is always welcome under certain
 circumstances.
 
@@ -20,4 +20,3 @@ school counter-based for loops.
 * There is no need for the generation of the step itself to be in a
 separate method. I've opted to do so here to show how to return a step
 closure from a method.
-
