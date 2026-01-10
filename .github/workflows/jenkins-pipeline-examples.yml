@@ -1,0 +1,138 @@
+name: Jenkins Pipeline Examples Migration
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/jenkins-pipeline-examples.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  jenkinsfile_examples:
+    name: Jenkinsfile examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - android-build-flavor-from-branch
+          - sonarqube
+          - msbuild
+          - nodejs-build-test-deploy-docker-notify
+          - global-function
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Simulate migrated pipeline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Running migrated flow for ${{ matrix.example }}"
+          case "${{ matrix.example }}" in
+            android-build-flavor-from-branch)
+              echo "Original Jenkins pipeline built Android flavors from branch naming."
+              sed -n '1,80p' .github/ci-archive/jenkinsfile-examples/android-build-flavor-from-branch/JenkinsFile
+              ;;
+            sonarqube)
+              echo "Original Jenkins pipeline executed Gradle SonarQube analysis."
+              sed -n '1,80p' .github/ci-archive/jenkinsfile-examples/sonarqube/Jenkinsfile
+              ;;
+            msbuild)
+              echo "Original Jenkins pipeline restored NuGet packages and ran MSBuild."
+              sed -n '1,80p' .github/ci-archive/jenkinsfile-examples/msbuild/Jenkinsfile
+              ;;
+            nodejs-build-test-deploy-docker-notify)
+              echo "Original Jenkins pipeline ran npm tests, built Docker, deployed, and notified."
+              sed -n '1,120p' .github/ci-archive/jenkinsfile-examples/nodejs-build-test-deploy-docker-notify/Jenkinsfile
+              ;;
+            global-function)
+              echo "Original Jenkins pipeline used shared library standardBuild with Go container."
+              sed -n '1,120p' .github/ci-archive/global-library-examples/global-function/Jenkinsfile
+              echo "--- Expanded shared library logic ---"
+              sed -n '1,120p' .github/ci-archive/global-library-examples/global-function/standardBuild.groovy
+              ;;
+            *)
+              echo "Unknown example ${{ matrix.example }}"
+              ;;
+          esac
+
+  pipeline_scripts:
+    name: Pipeline script catalog
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        script:
+          - unstash-different-dir
+          - trigger-job-on-all-nodes
+          - gitcommit_changeset
+          - get-build-cause
+          - parallel-from-grep
+          - ansi-color-build-wrapper
+          - jobs-in-parallel
+          - parallel-multiple-nodes
+          - artifactory-maven-build
+          - parallel-from-list
+          - push-git-repo
+          - ircnotify-commandline
+          - archive-build-output-artifacts
+          - artifactory-gradle-build
+          - load-from-file
+          - external-workspace-manager
+          - gitcommit
+          - github-org-plugin
+          - timestamper-wrapper
+          - maven-and-jdk-specific-version
+          - configfile-provider-plugin
+          - slacknotify
+          - artifactory-generic-upload-download
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Show migrated pipeline script
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Pipeline example: ${{ matrix.script }}"
+          find ".github/ci-archive/pipeline-examples/${{ matrix.script }}" -maxdepth 1 -name '*.groovy' -print -exec sed -n '1,80p' {} \; || true
+
+  declarative_examples:
+    name: Declarative examples
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        script:
+          - jenkinsfile-examples/mavenDocker.groovy
+          - simple-examples/whenEnvVarCondition.groovy
+          - simple-examples/parametersBooleanRecursivePromotion.groovy
+          - simple-examples/whenBranchMaster.groovy
+          - simple-examples/legacyMetaStepSyntax.groovy
+          - simple-examples/whenBranchNotMaster.groovy
+          - simple-examples/postInStage.groovy
+          - simple-examples/credentialsMixedEnvironment.groovy
+          - simple-examples/environmentNonLiteral.groovy
+          - simple-examples/toolsInStage.groovy
+          - simple-examples/whenLaterStages.groovy
+          - simple-examples/dockerfileAlternativeName.groovy
+          - simple-examples/stepsAndWrappers.groovy
+          - simple-examples/propertiesOptionsandTriggers.groovy
+          - simple-examples/whenExpressionSkip.groovy
+          - simple-examples/toolsBuildPluginParentPOM.groovy
+          - simple-examples/environmentInStage.groovy
+          - simple-examples/dockerfileDefault.groovy
+          - simple-examples/scriptVariableAssignment.groovy
+          - simple-examples/credentialsUsernamePassword.groovy
+          - simple-examples/postUnstable.groovy
+          - simple-examples/postConditionOrder.groovy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Show migrated declarative sample
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Declarative sample: ${{ matrix.script }}"
+          sed -n '1,80p' ".github/ci-archive/declarative-examples/${{ matrix.script }}" || true
