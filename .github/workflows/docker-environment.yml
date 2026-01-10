@@ -15,6 +15,9 @@ on:
     branches:
       - '*'
 
+permissions:
+  contents: read
+
 jobs:
   # ========================================
   # Default Dockerfile

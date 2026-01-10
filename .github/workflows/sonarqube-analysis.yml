@@ -11,6 +11,9 @@ on:
     branches:
       - '*'
 
+permissions:
+  contents: read
+
 jobs:
   sonarqube-gradle:
     name: SonarQube Gradle Analysis

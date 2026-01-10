@@ -393,7 +393,7 @@ All actions are pinned to specific commit SHAs for security:
 | `actions/setup-java` | v4.2.1 | `99b8673` | Java/JDK setup |
 | `actions/setup-node` | v4.0.2 | `60edb5d` | Node.js setup |
 | `actions/upload-artifact` | v4.3.1 | `5d5d22a` | Artifact upload |
-| `actions/download-artifact` | v4.1.2 | `eaceaf8` | Artifact download |
+| `actions/download-artifact` | v4.1.3 | `1c4c42d` | Artifact download |
 | `actions/cache` | v4.0.2 | `0c45773` | Dependency caching |
 | `docker/setup-buildx-action` | v3.2.0 | `2b51285` | Docker Buildx |
 | `docker/login-action` | v3.1.0 | `e92390c` | Docker registry login |
@@ -405,6 +405,8 @@ All actions are pinned to specific commit SHAs for security:
 | `jfrog/setup-jfrog-cli` | v4.1.2 | `9fe0f98` | JFrog CLI |
 | `slackapi/slack-github-action` | v1.26.0 | `70cd7be` | Slack notifications |
 | `nick-fields/retry` | v3.0.0 | `7152eba` | Retry logic |
+
+**Note:** All workflows include explicit `permissions: contents: read` blocks for security.
 
 ---
 

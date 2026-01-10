@@ -11,6 +11,9 @@ on:
     branches:
       - '*'
 
+permissions:
+  contents: read
+
 env:
   # These will be set dynamically in build job
   IMAGE: ''

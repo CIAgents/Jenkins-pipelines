@@ -14,6 +14,9 @@ on:
     branches:
       - '*'
 
+permissions:
+  contents: read
+
 jobs:
   # ========================================
   # Android Build (from android-build-flavor-from-branch/JenkinsFile)
