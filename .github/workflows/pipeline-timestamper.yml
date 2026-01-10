@@ -1,0 +1,31 @@
+name: Timestamper Wrapper
+
+# Migrated from: pipeline-examples/timestamper-wrapper/timestamperWrapper.groovy
+# Original Jenkins pipeline: Scripted pipeline with timestamper wrapper
+# Note: GitHub Actions automatically adds timestamps to all log output
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  timestamped-build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: First echo
+        run: echo "Hey, look, I'm echoing with a timestamp!"
+      
+      - name: Sleeping
+        run: sleep 30
+      
+      - name: Second echo
+        run: echo "Wonder what time it is now?"

@@ -1,0 +1,41 @@
+name: MSBuild Example
+
+# Migrated from: jenkinsfile-examples/msbuild/Jenkinsfile
+# Original Jenkins pipeline: Scripted pipeline with MSBuild
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+      
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+      
+      - name: Restore NuGet packages
+        run: nuget restore SolutionName.sln
+      
+      - name: Build solution
+        run: msbuild SolutionName.sln /p:Configuration=Release /p:Platform="Any CPU" /p:ProductVersion=1.0.0.${{ github.run_number }}
+      
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: ProjectName/bin/Release/**

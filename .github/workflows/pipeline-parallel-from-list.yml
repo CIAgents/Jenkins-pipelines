@@ -1,0 +1,28 @@
+name: Parallel From List
+
+# Migrated from: pipeline-examples/parallel-from-list/parallelFromList.groovy
+# Original Jenkins pipeline: Scripted pipeline with parallel execution from list
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  parallel-execution:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        item: [a, b, c, d]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Echo item
+        run: echo "${{ matrix.item }}"

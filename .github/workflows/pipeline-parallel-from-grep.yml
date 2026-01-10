@@ -1,0 +1,40 @@
+name: Parallel from Grep Pattern
+
+# Migrated from: pipeline-examples/parallel-from-grep/parallelFromGrep.groovy
+# Original: Scripted pipeline that dynamically builds parallel jobs from Jenkins instance
+# Note: This pattern queries Jenkins API which doesn't apply to GitHub Actions
+# Instead, this demonstrates a matrix strategy with job filtering
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  # GitHub Actions doesn't query other jobs like Jenkins does
+  # Instead, define jobs explicitly or use repository dispatch/API
+  parallel-jobs:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        job:
+          - { name: 'test-dev-unit', environment: 'dev', type: 'unit' }
+          - { name: 'test-dev-integration', environment: 'dev', type: 'integration' }
+          - { name: 'test-stage-unit', environment: 'stage', type: 'unit' }
+          - { name: 'test-stage-integration', environment: 'stage', type: 'integration' }
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Run job ${{ matrix.job.name }}
+        run: |
+          echo "Running job: ${{ matrix.job.name }}"
+          echo "Environment: ${{ matrix.job.environment }}"
+          echo "Type: ${{ matrix.job.type }}"
+          # Add actual test execution here

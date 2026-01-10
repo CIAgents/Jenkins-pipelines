@@ -1,0 +1,109 @@
+name: Maven Docker Build
+
+# Migrated from: declarative-examples/jenkinsfile-examples/mavenDocker.groovy
+# Original Jenkins pipeline: Declarative pipeline with Maven, Docker, parallel stages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: maven:3.5.0-jdk-8
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Read Maven POM information
+        id: maven-info
+        run: |
+          echo "image=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_OUTPUT
+          echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+      
+      - name: Build with Maven
+        run: mvn clean findbugs:findbugs package
+      
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: '**/target/surefire-reports/*.xml'
+      
+      - name: Archive JAR artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-files
+          path: '**/target/*.jar'
+  
+  quality-analysis:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    strategy:
+      matrix:
+        include:
+          - name: Integration Test
+            stage: integration-test
+          - name: Sonar Scan
+            stage: sonar-scan
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Integration Test
+        if: matrix.stage == 'integration-test'
+        run: echo 'Run integration tests here...'
+      
+      - name: Sonar Scan
+        if: matrix.stage == 'sonar-scan'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          docker run --rm -v $PWD:/usr/src maven:3.5.0-jdk-8 \
+            mvn sonar:sonar -Dsonar.login=$SONAR_TOKEN
+  
+  build-publish-image:
+    runs-on: ubuntu-latest
+    needs: quality-analysis
+    if: github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Read Maven POM information
+        id: maven-info
+        run: |
+          echo "image=$(mvn help:evaluate -Dexpression=project.artifactId -q -DforceStdout)" >> $GITHUB_OUTPUT
+          echo "version=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_OUTPUT
+      
+      - name: Build and push Docker image
+        env:
+          IMAGE: ${{ steps.maven-info.outputs.image }}
+          VERSION: ${{ steps.maven-info.outputs.version }}
+        run: |
+          docker build -t ${IMAGE} .
+          docker tag ${IMAGE} ${IMAGE}:${VERSION}
+          docker push ${IMAGE}:${VERSION}
+        # Note: Requires DOCKER_USERNAME and DOCKER_PASSWORD secrets configured
+      
+      - name: Send failure notification
+        if: failure()
+        run: |
+          echo "Would send email to team@example.com"
+          echo "Subject: Failed Pipeline: ${{ github.workflow }}"
+          echo "Body: Something is wrong with ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        # Configure with email action if needed:
+        # uses: dawidd6/action-send-mail@v3
