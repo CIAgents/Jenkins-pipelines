@@ -1,0 +1,69 @@
+name: Recursive Promotion Example
+
+# Converted from: declarative-examples/simple-examples/parametersBooleanRecursivePromotion.groovy
+# Original: Declarative pipeline with parameters and conditional execution
+
+on:
+  workflow_dispatch:
+    inputs:
+      simul:
+        description: 'Simulate the promotion'
+        required: true
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+
+jobs:
+  check-run-number:
+    runs-on: ubuntu-latest
+    outputs:
+      should-promote: ${{ steps.check.outputs.should-promote }}
+    steps:
+      - name: Check if run number is odd
+        id: check
+        run: |
+          if [ $((  ${{ github.run_number }} % 2 )) -eq 1 ]; then
+            echo "should-promote=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should-promote=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  promote:
+    runs-on: ubuntu-latest
+    needs: check-run-number
+    # Only run when the current build number is odd (simulating Jenkins logic)
+    if: needs.check-run-number.outputs.should-promote == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Display promotion info
+        run: |
+          echo "Running promotion workflow"
+          echo "Run number: ${{ github.run_number }}"
+          echo "Simulation mode: ${{ inputs.simul }}"
+
+      - name: Trigger recursive promotion
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const result = await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'recursive-promotion.yml',
+              ref: context.ref,
+              inputs: {
+                simul: '${{ inputs.simul }}'
+              }
+            });
+            console.log('Triggered workflow dispatch:', result.status);
+
+      - name: Log completion
+        run: |
+          echo "Promotion step completed"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Triggered by: ${{ github.actor }}"

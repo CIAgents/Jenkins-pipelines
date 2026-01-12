@@ -1,0 +1,55 @@
+name: Parallel Execution Example
+
+# Converted from: pipeline-examples/parallel-from-list/parallelFromList.groovy
+# Original: Scripted pipeline with parallel execution from dynamic list
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # Parallel jobs that echo different strings
+  # Original Jenkins: def stringsToEcho = ["a", "b", "c", "d"]
+  
+  echo-a:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo string a
+        run: echo "a"
+
+  echo-b:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo string b
+        run: echo "b"
+
+  echo-c:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo string c
+        run: echo "c"
+
+  echo-d:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo string d
+        run: echo "d"
+
+  # Summary job that runs after all parallel jobs complete
+  summary:
+    runs-on: ubuntu-latest
+    needs: [echo-a, echo-b, echo-c, echo-d]
+    if: always()
+    
+    steps:
+      - name: Display completion status
+        run: |
+          echo "All parallel echo jobs completed"
+          echo "Job statuses:"
+          echo "  echo-a: ${{ needs.echo-a.result }}"
+          echo "  echo-b: ${{ needs.echo-b.result }}"
+          echo "  echo-c: ${{ needs.echo-c.result }}"
+          echo "  echo-d: ${{ needs.echo-d.result }}"
